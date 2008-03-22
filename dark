@@ -1,0 +1,18 @@
+#!/bin/sh
+# Toggle LCD darkness (i. e. switch on or off LCD)
+# Is a no-op if the display does not support switching off.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/dark $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+TOOL=/usr/sbin/radeontool
+test -x $TOOL || exit
+NEWSTATE=$(
+	test $(
+		$TOOL light | cut -d' ' -f5
+	) == off && echo on || echo off
+)
+/usr/bin/logger -p user.notice -t dark "Switching LCD backlight $NEWSTATE"
+$TOOL light $NEWSTATE

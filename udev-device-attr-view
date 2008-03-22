@@ -1,0 +1,24 @@
+#! /bin/sh
+#
+# Shows significant information for writing a udev rule
+# for a given device.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/udev-device-attr-view $
+# $Author: root $
+# $Date: 2007-03-16T11:44:05.936886Z $
+# $Revision: 593 $
+
+
+die() {
+	echo "ERROR: $*" >& 2
+	exit 1
+}
+
+
+if [ -z "$1" ] || [ ! -e "$1" ]; then
+	die "Usage: $0 <path/to/device>"
+fi
+if [ ! -b "$1" ] && [ ! -c "$1" ]; then
+	die "'$1' is not a device node!"
+fi
+udevinfo -a -p `udevinfo -q path -n "$1"`

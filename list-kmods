@@ -1,0 +1,10 @@
+#!/bin/sh
+# Print a sorted list of current kernel modules and their MD5 checksums.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/list-kmods $
+# $Author: root(xvaio) $
+# $Date: 2006-09-14T15:31:38.228396Z $
+# $Revision: 294 $
+
+/usr/bin/find /lib/modules/$(/bin/uname -r) -name '*.ko' -type f \
+	-exec /usr/bin/md5sum -b "{}" \; | LC_ALL=C sort -k2

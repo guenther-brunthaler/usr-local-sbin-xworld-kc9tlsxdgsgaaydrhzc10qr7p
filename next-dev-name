@@ -1,0 +1,66 @@
+#!/usr/bin/perl
+# When passed a string like "tty", returns "tty24" if "/dev/tty1"
+# through "/dev/tty23" existed and "/dev/tty24" did not.
+# If no "/dev/tty*" existed at all, returns "tty".
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/next-dev-name $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+# (C) by 2006 Guenther Brunthaler
+# May be distributed under the terms of the GPL.
+
+
+use strict;
+
+
+my($namedesc, $startindex)= splice @ARGV, 0, 2 and @ARGV == 0
+or die << ".";
+Usage: $0 <namedesc> [ <startindex> ]
+where
+<namedesc>:
+ /dev/<namedesc><N> are the device file names to be searched for
+ (where <N> is an integer or an empty string).
+ The enumeration order for <N> will be: Empty string, 1, 2, and so on.
+ If <namedesc> ends at a "/", the enumeration will start at 0 instead.
+ The lowest unused name will be printed.
+ <namedesc> may contain any number of '/' indicating subdirectories of /dev.
+<startindex>
+ The search for an unused <N> starts with this
+ value. Defaults to the empty string.
+
+Examples:
+$0 firewire/
+ will create /dev/firewire/0, /dev/firewire/1, ...
+$0 firewire
+ will create /dev/firewire, /dev/firewire1, ...
+$0 tty 0
+ will create /dev/tty0, /dev/tty1, ...
+$0 vcs 1
+ will create /dev/vcs1, /dev/vcs2, ...
+.
+my($prefix, $dir, $basename)= $namedesc =~ m<
+   ^ ( (?: (.*) / )? )
+   ( [^/]* ) $
+>x or die;
+$dir= '/dev' . ($dir ? "/$dir" : '');
+$startindex= '' unless defined $startindex;
+#print "pfx '$prefix'\ndir '$dir'\nbn '$basename'\nsi '$startindex'\n";
+die unless -d '/dev';
+my(%N, $i);
+if (opendir DEV, $dir) {
+  my $pat= qr"^$basename(\d*)$";
+  while (defined($_= readdir DEV)) {
+     $N{$1 eq '' ? '' : $1 + 0}= 1 if m/$pat/;
+  }
+  closedir DEV or die;
+}
+if ($startindex eq '') {
+   if ($basename gt '' && !exists $N{''}) {
+      print "$prefix$basename\n";
+      exit;
+   }
+   $startindex= $basename eq '' ? 0 : 1;
+}
+for ($i= $startindex; exists $N{$i}; ++$i) {}
+print "$prefix$basename$i\n";

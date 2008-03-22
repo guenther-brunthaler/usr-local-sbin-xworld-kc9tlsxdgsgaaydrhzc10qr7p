@@ -1,0 +1,55 @@
+#!/bin/sh
+trap "" INT QUIT TSTP
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/shutdown-login $
+# $Author: root(xtreme) $
+# $Date: 2006-08-24T06:38:16.700353Z $
+# $Revision: 241 $
+
+
+SHUTDOWN="/sbin/shutdown"
+DEFAULT=5
+
+
+abort() {
+	echo "Aborting. Not shutting down."
+	read -p "Press Enter to continue. "
+	clear
+	exit 0
+}
+
+
+echo
+echo "System Shut Down"
+echo "================"
+echo
+echo "The shutdown will be announced immediately to all logged-in users,"
+echo "but the actual shut down sequence will be delayed for a couple of"
+echo "minutes in order to give any logged-in users a chance to save"
+echo "any unsaved data to disk and log out before the system goes down."
+echo
+echo "Unless in the case of an absolute emergency (such as an impending"
+echo "power failure), please allow the shutdown to be delayed for"
+echo "at least 3 minutes."
+echo
+while true; do
+	REPLY=
+	read -t 120 -p \
+	"Delay before shutdown in minutes or 'a' to abort [$DEFAULT]? "
+	test -z "$REPLY" && REPLY="$DEFAULT"
+	echo
+	if test "$REPLY" -ge 0 -a "$REPLY" -lt 1440 2> /dev/null; then
+		echo "System will shut down in $REPLY minutes."
+		"$SHUTDOWN" -hP +$REPLY &
+		sleep 3
+		break
+	fi
+	abort
+done
+echo
+echo "Do nothing in order to wait for the shutdown to occur."
+echo "Or press [Enter] in order to abort the shutdown."
+read
+"$SHUTDOWN" -c 2> /dev/null
+sleep 2
+echo
+abort

@@ -1,0 +1,10 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/wait-until-net-and-cpu-idle $
+# $Author: root $
+# $Date: 2007-08-16T20:26:52.987724Z $
+# $Revision: 903 $
+
+
+while wait-for-system-idle || wait-for-network-idle; do
+	true
+done

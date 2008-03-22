@@ -1,0 +1,12 @@
+#! /bin/sh
+# Takes a list of <catagory>/<package> and adds ":<comment>".
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/comment-packages $
+# $Author: root(xvaio) $
+# $Date: 2006-10-30T20:02:05.357488Z $
+# $Revision: 370 $
+
+
+while read PKG; do
+	esearch --fullname --nocolor --own '%p:%d\n' "$PKG" | head --lines 1
+done

@@ -1,0 +1,12 @@
+#! /usr/bin/perl
+# Extracts <category>/<package> from an emerge-generated package list.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/extract-category-and-package $
+# $Author: root(xvaio) $
+# $Date: 2006-10-30T20:02:05.357488Z $
+# $Revision: 370 $
+
+
+while (defined($_= <>)) {
+   print if s{^.*] (\S*?)-\d.*?$}{$1};
+}

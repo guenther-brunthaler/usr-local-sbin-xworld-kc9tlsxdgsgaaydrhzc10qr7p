@@ -1,0 +1,17 @@
+#! /bin/sh
+# "localedef --help" shows default paths where to find files.
+
+
+# $1: deffile
+# $2: charset
+# $3: outname
+defloc() {
+	localedef --force --replace --no-archive \
+		--charmap="$2" --inputfile="$1" "$3"
+}
+
+
+defloc /usr/local/share/i18n/locales/de_AT@vienna UTF-8 de_AT.utf8
+defloc /usr/local/share/i18n/locales/de_AT@vienna ISO-8859-15 de_AT.iso_8859_15
+defloc en_US UTF-8 en_US.utf8
+defloc de_DE UTF-8 de_DE.utf8

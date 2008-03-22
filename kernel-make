@@ -1,0 +1,63 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/kernel-make $
+# $Author: root $
+# $Date: 2007-04-12T18:59:22.152376Z $
+# $Revision: 604 $
+
+
+die() {
+	echo "ERROR: $1" >& 2
+	exit 1
+}
+
+
+# $1: mount point.
+is_mounted() {
+	local T M IFS
+	while read T M T; do
+		test "$M" = "$1" && return
+	done < /etc/mtab
+	return 1
+}
+
+
+echo
+echo "Linux kernel build driver script."
+echo
+T="/usr/src/linux"
+cd "$T" || die "Cannot change directory to '$T'!"
+if [ "$(ls -1d ../linux-* 2> /dev/null | wc -l)" != 1 ]; then
+	echo "Warning: There is more than one set of kernel sources:"
+	echo
+	T="$(realpath ..)"
+	ls -ld --color=auto "$T/linux-"* "$T/linux"
+	echo
+	read -p "OK to use current 'linux' symlink? [Yn] " T
+	case "$T" in
+		""|Y|y|Yes|yes) ;;
+		*)
+			echo "Aborting." >& 2
+			exit
+		;;
+	esac
+	echo
+fi
+case "${0##*-}" in
+	menuconfig)
+		make menuconfig
+		exit
+		;;
+	xconfig)
+		make xconfig
+		exit
+		;;
+esac
+T="/boot"
+if ! is_mounted "$T"; then
+	echo "Mounting '$T'."
+	mount "$T" || die "Could not mount '$T'!"
+fi
+T="make && make modules_install && make install"
+echo "Now executing: $T"
+eval "$T"
+depmod -a

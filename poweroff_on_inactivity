@@ -1,0 +1,19 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/poweroff_on_inactivity $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+
+idle() {
+	# Returns 0 if idle; 1 otherwise.
+	return $(LC_ALL=C awk '{print $2 >= 0.25}' < /proc/loadavg)
+}
+
+
+echo "Waiting for 5 minutes of inactivity to power off the system..."
+test -x /usr/local/sbin/dark && sleep 5 && /usr/local/sbin/dark
+while ! idle; do sleep 120; done
+echo "System is idle! Initiating shutdown sequence..."
+logger -t poweroff_on_inactivity "System is idle! Starting countdown for shutdown..."
+nohup shutdown -hP 3 &>/dev/null &

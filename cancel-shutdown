@@ -1,0 +1,7 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/cancel-shutdown $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+/sbin/shutdown -c

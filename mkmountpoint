@@ -1,0 +1,24 @@
+#! /bin/sh
+# Create a mount point directory, or set the conventional
+# modes and owner for an existing one.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/mkmountpoint $
+# $Author: root $
+# $Date: 2007-05-06T15:05:27.775990Z $
+# $Revision: 653 $
+
+
+die() {
+	echo "ERROR: $*" >& 2
+	exit 1
+}
+
+
+if [ ! -e "$1" ]; then
+	mkdir -p "$1" || die "Could not create mount point directory '$1'!"
+elif [ ! -d "$1" ]; then
+	die "Mount point '$1' already exists and is not a directory!"
+fi
+chown nobody:nogroup "$1" || die "Could not set owner for '$1'!"
+chmod ugo=,-st "$1" || die "Could not set permissions for '$1'!"
+echo "Mount point directory '$1' has successfully been set up!"

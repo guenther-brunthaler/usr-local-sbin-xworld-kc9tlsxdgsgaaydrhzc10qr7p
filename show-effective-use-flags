@@ -1,0 +1,7 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/show-effective-use-flags $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+emerge --info | grep '^USE=' | sed -e 's/^.*="//; s/"$//' | fmt -w1 | sort | less

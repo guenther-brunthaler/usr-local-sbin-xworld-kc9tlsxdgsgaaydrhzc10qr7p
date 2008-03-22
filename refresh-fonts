@@ -1,0 +1,27 @@
+#! /bin/sh
+# Updates the meta-information files after new fonts have
+# been installed (or old ones have been removed.)
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/refresh-fonts $
+# $Author: root $
+# $Date: 2007-05-21T18:44:08.981199Z $
+# $Revision: 720 $
+
+
+run() {
+	"$@" && return
+	echo "ERROR: >>>$*<<< failed return code ${?}!" >& 2
+	exit 1
+}
+
+
+ENCODINGS="/usr/share/fonts/encodings"
+
+
+run cd /usr/share/fonts
+echo "Rebuilding font-installation metadata..."
+run find -type d \
+	-exec mkfontdir -e "$ENCODINGS" "{}" \; \
+	-exec mkfontscale -e "$ENCODINGS" "{}" \; \
+	-exec ttmkfdir -e "$ENCODINGS" "{}" \; \
+	-exec mkfontdir -e "$ENCODINGS" "{}" \;
+echo "Done."

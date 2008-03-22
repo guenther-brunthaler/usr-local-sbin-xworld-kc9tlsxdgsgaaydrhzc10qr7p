@@ -1,0 +1,55 @@
+#! /bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/tcmount $
+# $Author: root(xvaio) $
+# $Date: 2006-09-03T11:48:00.185929Z $
+# $Revision: 275 $
+
+
+. /usr/local/sbin/functions/tcmount.sh
+. /usr/local/bin/functions/lookup.sh --version 1 LOCAL_TARGETS
+
+
+# *** BEGIN OF CONFIGURATION SECTION ***
+# Set this to any nonempty value in order to enable debug diagnostics.
+OPT_DEBUG=
+# Default base directory for $VOLUMES, $KEYFILES and $MOUNTPOINTS.
+# (Note that ALL paths used by this script will resolved step-by-step,
+# expanding symlinks as they are encountered. This allows for
+# useful constructions like "/<comp1>/<symlink>/../<comp2>" where
+# the ".." refers to the already resolved <symlink>.)
+BASE="/var/local/lib/truecrypt"
+# Where TrueCrypt file-based containers (encrypted volumes) can be found.
+# Relative to $BASE if not an absolute path.
+VOLUMES="volumes"
+# Where TrueCrypt file-based containers (encrypted volumes) can be found.
+# Relative to $BASE if not an absolute path.
+DEVICES="/dev"
+# Where mountpoints for mounting the containers can be found.
+# Relative to $BASE if not an absolute path.
+MOUNTPOINTS="mnt"
+# Base directory where key files can be found.
+# Relative to $BASE if not an absolute path.
+KEYFILES=
+# Will be executed if it exists.
+# Must be specified relative to toplevel directory of mounted volume.
+OPTIONAL_SCRIPT="scripts/init_script"
+# Set to non-empty if you want to report the script if all went OK.
+TELL_OK=1
+# List of volumes to mount.
+# Entries consist of tuples 'tup1:tup2:...:tupN'.
+# (Each tuple is terminated by an 'end' option.)
+# Each tuple consists of a sub-tuple 'key1=val1:key2=val2:...:keyN=valN'
+# where the following keyN are supported:
+# 'dev': Device to mount (relative to $DEVICES if not absolute).
+# 'vol': Volume to mount (relative to $VOLUMES if not absolute).
+# 'dn': Device number to use (integer).
+# 'key': Key file name (relative to $KEYFILES if not absolute).
+# 'mnt': Mount point to use (relative to $MOUNTPOINTS if not absolute).
+# 'opt': Mount options to use. Must be "vfat" or "ntfs".
+# 'end': Specifies the end of the current tuple.
+TARGETS="$LOCAL_TARGETS"
+# *** END OF CONFIGURATION SECTION ***
+
+
+# Process options and pass through user options.
+process "$@" -- "$TARGETS"

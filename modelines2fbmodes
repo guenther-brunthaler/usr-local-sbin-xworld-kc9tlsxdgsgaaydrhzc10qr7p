@@ -1,0 +1,234 @@
+#!/usr/bin/perl
+#
+# Convert X11 ModeLines into fb.modes entries.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/modelines2fbmodes $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+
+use strict;
+use Getopt::Long 2.33 qw(:config bundling);
+use Pod::Usage;
+
+
+our %opt;
+our $VERSION= '$Revision: 212 $';
+
+
+($VERSION)= $VERSION =~ /(\d(?:[\d.]+))/;
+GetOptions(
+   \%opt, qw/verbose|v+ help|h|? input|i=s output|o=s depth|d=i/
+) or pod2usage(0);
+if ($opt{help}) {
+   pod2usage(
+      -exitval => 0, -verbose => $opt{verbose} || 0, -output => \*STDOUT
+   );
+}
+$opt{input}||= "/etc/X11/xorg.conf";
+$opt{depth}||= 24;
+open IN, '<', $opt{input} or die "Cannot open '$opt{input}': $!";
+if (defined $opt{output}) {
+   open OUT, '>', $opt{output} or die "Cannot create '$opt{output}': $!";
+   select OUT or die;
+}
+{
+   my($tool)= $0 =~ /([[:alnum:]\s._]+)$/;
+   my @t= localtime;
+   my $iso= sprintf
+      "%04u-%02u-%02u %02u:%02u:%02u"
+      , $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]
+   ;
+   print "# Generated $iso by $tool version $VERSION.\n";
+}
+while (defined($_= <IN>)) {
+   next unless my(
+      $name, $DCF, $HR, $SH1, $SH2, $HFL, $VR, $SV1, $SV2, $VFL, $opts
+   )= /
+      ^ \s* ModeLine \s* " ( [^"]+ ) " \s* ( \d+ (?: \. \d* )? )
+      \s+ (\d+) \s+ (\d+) \s+ (\d+) \s+ (\d+)
+      \s+ (\d+) \s+ (\d+) \s+ (\d+) \s+ (\d+)
+      (?: \s+ ( [^\#\s]+ (?: \s+ [^\#\s]+)* ) )?
+      \s* (?: \# | $ )
+   /ix;
+   my @opts= split /\s+/, $opts;
+   $opts= @opts ? " " . join(" ", @opts) : "";
+   my $modeline= "ModeLine $DCF $HR $SH1 $SH2 $HFL $VR $SV1 $SV2 $VFL$opts";
+   my $pixclock= int 1e6 / $DCF + .5;
+   my $left_margin= $HFL - $SH2;
+   my $right_margin= $SH1 - $HR;
+   my $hsync_len= $SH2 - $SH1;
+   my $upper_margin= $VFL - $SV2;
+   my $lower_margin= $SV1 - $VR;
+   my $vsync_len= $SV2 - $SV1;
+   print
+      qq'\nmode "$name"\n'
+      , "\t# $modeline\n"
+      , "\tgeometry $HR $VR $HR $VR $opt{depth}\n"
+      , "\ttimings $pixclock"
+      , " $left_margin $right_margin $upper_margin $lower_margin"
+      , " $hsync_len $vsync_len\n"
+      , join(
+            ""
+            , map {
+               "\t" . (
+                  ${{
+                     doublescan => 'double true'
+                     , interlace => 'laced true'
+                     , +hsync => 'hsync high'
+                     , -hsync => 'hsync low'
+                     , +vsync => 'vsync high'
+                     , -vsync => 'vsync low'
+                     , +csync => 'csync high'
+                     , -csync => 'csync low'
+                  }}{+lc}
+                  || 'error unsupported'
+               )
+               . "\n"
+            } @opts
+         )
+      , 
+      , "endmode\n"
+   ;
+}
+close IN or die;
+if (defined $opt{output}) {
+   select or die;
+   close OUT or die "Cannot finish writing '$opt{output}': $!";
+}
+
+__END__
+
+=head1 NAME
+
+modelines2fbmodes - convert X11 ModeLines to framebuffer modes
+
+=head1 SYNOPSIS
+
+modelines2fbmodes [options]
+
+Most important options:
+
+=over
+
+=item -i <file>: Specify X11 configuration file
+
+=item -o <file>: Write output to <file>.
+
+=item -hv: Display full help.
+
+=item -hvv: Display man page.
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item --input <file>
+
+=item -i <file>
+
+Provide X11 configuration file to be parsed.
+Defaults to F</etc/X11/xorg.conf>.
+
+=item --output <file>
+
+=item -o <file>
+
+File where output should be written to,
+such as F</etc/fb.modes>.
+Defaults to standard output.
+
+=item --depth <integer>
+
+=item -d <integer>
+
+The bit depth to be used for the generated entries.
+Defaults to 24.
+
+=item --verbose
+
+=item -v
+
+Be more verbose.
+
+Increases the amount of informational output in some situations.
+
+Can be specified multiple times to increase verbosity even more.
+
+=item --help
+
+=item -h
+
+=item -?
+
+Displays a short usage synopsis.
+
+When combined with a single --verbose option,
+the full help will be displayed.
+
+When combined with two --verbose options,
+the man page will be displayed.
+
+=item --version
+
+Display version information.
+
+=back
+
+=head1 DESCRIPTION
+
+modelines2fbmodes reads an X11 configuration file such as
+F</etc/X11/xorg.conf>, and generates equivalent framebuffer device
+description sections for each ModeLine encountered.
+
+The generated text has a format that can directly be used as valid
+contents for the F</etc/fb.modes> file.
+
+=head1 BUGS
+
+Does not actually parse the complete X11 configuration file, and is thus
+unable to correctly determine the bit depth for the various modes.
+
+The --depth switch was been added as a kludge for this.
+
+Also, I discovered that not all converted modelines actually work, even
+though C<fbset -x> indicates they should.
+
+I have no idea why.
+
+But luckily, most of the time the converted entries work.
+
+However, the B<most severe> bug of all is this:
+
+After finishing this tool, I learned by accident (by means of bash command
+line completion) that Patrick Reynolds already wrote a script L<modeline2fb>
+which ships as part of L<fbset> and does nearly exactly the same thing as
+mine and was even installed on my Linux box...
+
+Grrrr!
+
+At least my version of the script is slightly superior in that it supports
+comments in the mode lines, and it annotates the generated framebuffer modes
+with the original modelines.
+
+But that would certainly not have been worth a rewrite... it isn't exactly
+fun to re-invent the wheel.
+
+=head1 SEE ALSO
+
+L<fbset(8)>, L<fb.modes(8)>
+L<http://www.faqs.org/docs/Linux-HOWTO/Framebuffer-HOWTO.html#toc18>,
+L<modeline2fb>.
+
+=head1 AUTHOR
+
+Written 2006 by Guenther Brunthaler.
+
+=head1 LICENSE
+
+Released under the terms of the GPL.
+
+=cut

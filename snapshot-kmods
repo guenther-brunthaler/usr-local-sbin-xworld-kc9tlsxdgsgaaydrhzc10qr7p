@@ -1,0 +1,37 @@
+#!/bin/sh
+# Create and save a list of current kernel modules and checksums.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/snapshot-kmods $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+die() {
+	echo "$1" > /dev/stderr
+	exit 1
+}
+
+force_cd() {
+	cd "$1" && return
+	die "Cannot change to directory \"1\"!"
+}
+
+do_cd() {
+	if [ ! -d "$1" ]; then
+		mkdir -m 700 "$1" || die "Cannot create directory \"$1\"!"
+	fi
+	force_cd "$1"
+}
+
+save_deltas() {
+	return
+}
+
+force_cd ~
+do_cd .kmods
+do_cd "$(uname -r)"
+case "${0##*/}" in
+	*snapshot*) list-kmods > modlist;;
+	*save*) save_deltas;;
+	*) echo "unknown command invocation"
+esac

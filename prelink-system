@@ -1,0 +1,238 @@
+#!/bin/sh
+#
+# Prelinks system or updates existing prelinks.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/prelink-system $
+# $Author: root(xvaio) $
+# $Date: 2006-09-09T09:08:25.819187Z $
+# $Revision: 288 $
+#
+# Written by Guenther Brunthaler in 2006.
+
+
+# Change this to anything you like.
+STATE_FILE="$HOME/.prelink-system.state"
+
+
+usage() {
+	cat <<- "."
+	prelink-system - apply prelinking to the local system
+	
+	Usage: prelink-system [ options ] 
+	
+	options:
+	--full, -f: Process all objects. SLOW.
+	--incremental, -i: Process only new/updated objects.
+	--help, -h: Display this help text.
+	--verbose, -v: Verbose operation.
+	--dry-run, -n: Simulated run. Shows what would be done.
+	--quiet, -q, --silent:
+	    Don't output anything.
+	    Only the return code will indicate success or failure.
+	    No warnings will be displayed at all.
+	    
+	prelink-system is a wrapper script for the "prelink" command.
+	If applies the best prelink options and parameters for your system.
+	
+	Prelinking can make your applications start considerably faster,
+	especially if heavy-weight desktop environments like KDE are used.
+	
+	prelink-system can operate in two different modes, "full" and
+	"incremental", as specified using the command line options. The
+	default mode is "incremental", unless if run for the first time,
+	when "full" will be the default.
+	
+	In full mode, each and every library and executable within prelink's
+	search path will be processed. This will take a long time, but will
+	will be done thoroughly. Because of its long running time, full mode
+	should only be used once in a month or so, or after reaching some sort
+	of "system installation milestone", such as recompiling large parts of
+	the system.
+	
+	In incremental mode, only new or updated libraries and executables
+	within prelink's search path will be examined, and thus there may be a
+	very small chance for doing things not as optimal as in full mode.
+	
+	However, incremental mode is much faster than full mode, and can
+	therefore be run after every "emerge" installation operation or on a
+	daily basis without performance concerns.
+	
+	Note: The effect of prelinking will only be as good as the settings of
+	PRELINK_PATH and PRELINK_PATH_MASK which can be customized in your
+	/etc/env.d/99local configuration file.
+	
+	I suggest adding the following lines to that configuration files,
+	unless you know what you are doing and see a stringent reason not to
+	do so:
+
+	---cut here---	
+	PRELINK_PATH="/usr/local/bin:/usr/local/sbin:/usr/local/opt:/opt\
+	:/usr/kde/3.5/lib"
+	PRELINK_PATH_MASK="/opt/doc:/opt/include:/opt/info:/opt/man\
+	:/usr/local/opt/doc:/usr/local/opt/include:/usr/local/opt/info\
+	:/usr/local/opt/man"
+	---cut here---
+
+	Don't forget to run env-update after any change to 99local, or
+	otherwise your changes won't have any effect.
+	
+	Version 1.0
+	Written by Guenther Brunthaler in 2006.
+.
+}
+
+
+die() {
+	{
+		echo "ERROR: $*"
+		echo "Use $0 --help for help."
+	} >& 2
+	exit 1
+}
+
+
+warn() {
+	echo "WARNING: $*" >& 2
+}
+
+
+seh_setup_check() {
+	local ME; ME="$0.$$"
+	test "$SEH_INIT" = "$ME" && return
+	SEH_INIT="$ME";	SEH_DTORS=
+	trap seh_process 0
+}
+
+
+seh_process() {
+	local DTOR TAIL
+	while [ -n "$SEH_DTORS" ]; do
+		TAIL="${SEH_DTORS#*:}";	DTOR="${SEH_DTORS%$TAIL}"
+		SEH_DTORS="$TAIL"; DTOR="${DTOR%:}"
+		"$DTOR" || warn "Clean-up function $DTOR() failed!"
+	done
+}
+
+
+finally() {
+	seh_setup_check; SEH_DTORS="$1:$SEH_DTORS"
+}
+
+
+load_state() {
+	if [ ! -e "$STATE_FILE" ]; then
+		STATE="initial"
+		return
+	fi
+	STATE=
+	read STATE < "$STATE_FILE" 2> /dev/null
+	test -n "$STATE" || die "Failed reading state from '$STATE_FILE'!"
+	LAST_STATE="$STATE"
+}
+
+
+save_state() {
+	test "$STATE" = "$LAST_STATE" && return
+	echo "$STATE" > "$STATE_FILE" || \
+		die "Could not write state file '$STATE_FILE'!"
+}
+
+
+inform() {
+	test -z "$VERBOSE" && return
+	echo $*
+}
+
+
+do_prelink() {
+	if [ -n "$DRY" ]; then
+		echo "# prelink $*"
+		return
+	fi
+	prelink "$@" || die "Could not prelink $*"
+}
+
+
+out_of_addresses() {
+	echo "Out of virtual address space. Full prelinking impossible."
+	echo "(Seems it's time for you to purchase some 64 bit processor?)"
+	echo "Reverting to inefficient standard prelinking scheme."
+	echo "(Still better than no prelinking at all.)"
+	inform "Undoing current prelinkage..."
+	STATE=conservative
+	do_prelink --undo --all
+	inform "Prelinking the conservative standard way..."
+	inform "(This will be remembered for future sessions.)"
+	do_prelink --force --all --random --conserve-memory
+}
+
+
+FULL=
+VERBOSE=
+QUIET=
+DRY=
+load_state
+if [ "$STATE" = "initial" ]; then
+	FULL=1;	VERBOSE=1
+fi
+COPTS=
+while true; do
+	if [ -z "$COPTS" ]; then
+		case "$1" in
+			-?*) COPTS="$1"; shift;;
+			*) break;;
+		esac
+	fi
+	if [ "${COPTS#--}" = "$COPTS" ]; then
+		TAIL="${COPTS#-?}"; # Switch custering.
+		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
+	else
+		COPT="$COPTS"; COPTS=
+	fi
+	case "$COPT" in
+		--) break;;
+		--help | -h) usage; exit;;
+		--version)
+			# Sychronize this with the usage text!
+			echo "Version 1.0"
+			exit;;
+		--verbose | -v) VERBOSE=1;;
+		--dry-run | -n) DRY=1;;
+		--quiet | --silent | -q) QUIET=1;;
+		--full | -f) FULL=1;;
+		--incremental | -i) FULL='';;
+		*) die "Unknown option '$COPT'!";;
+	esac
+done
+test $# = 0 || die "Unexpected excess arguments: $*"
+if [ -n "$QUIET" -a -z "$DRY" ]; then
+	CMD="${FULL:+--full}"
+	exec "$0" "${CMD:---incremental}" > /dev/null 2>& 1
+fi
+test -z "$DRY" && finally save_state
+if [ -n "$FULL" ]; then
+	inform "Full system prelink phase 1 - undoing old prelinkage..."
+	do_prelink --undo --all
+	inform "Full system prelink phase 2 - prelinking binaries..."
+	do_prelink --force --all --conserve-memory
+	inform "Full system prelink phase 3 - prelinking libraries..."
+	if prelink --force --libs-only --all --random; then
+		STATE=flat
+	else
+		out_of_addresses
+	fi
+else
+	inform "\"Prelinking\" (relocating) new/updated libraries..."
+	if [ $STATE == conservative ]; then
+		inform "(Using low-efficiency conservative standard mode.)"
+		do_prelink --all --random --conserve-memory
+	else
+		inform "(Using full-efficiency mode.)"
+		if prelink --libs-only --all --quick --random; then
+			STATE=flat
+		else
+			out_of_addresses
+		fi
+	fi
+fi
+inform "Prelinking complete."

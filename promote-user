@@ -1,0 +1,247 @@
+#! /bin/sh
+# Promote a user to a higher encryption level.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/promote-user $
+# $Author: root $
+# $Date: 2007-05-23T17:38:46.296297Z $
+# $Revision: 742 $
+
+
+LEVEL_PREFIX="level"
+
+
+usage() {
+	cat <<- "."
+	promote-user - promote user to a higher encryption level
+
+	Assuming the current system provides differently strong encrypted
+	volumes for storing sensitive user data, members of group "level1"
+	have access to the weakest encrypted such volume. Members of group
+	"level2" have access to an ever stronger encrypted volume, and so on.
+	
+	All members of a group for some encryption level will automatically
+	inherit membership of all lower encryption levels, i. e. a member of
+	group level2 will also be a member of group level1.
+	
+	By default, a newly created user will not be a member of any
+	encryption level group. The promote-user command can be used to change
+	that.
+	
+	This tool will also create subdirectories for the user for each level
+	he or she has been promoted, and will place symlinks in those
+	directories to chain them together. The symlink for level1-members
+	will be created as
+	
+	$HOME/p
+	
+	and the symlink for level-2 will be created as
+	
+	$HOME/p2
+	
+	and so on. For each nested p or p$N directory there will also be a
+	symlink "parent" created, which points back to the directory where the
+	p/p$N symlink came from. For instance,
+	
+	$HOME/p/parent
+	
+	will point back to
+	
+	$HOME
+	
+	and
+	
+	$HOME/p/p2/parent
+	
+	will point back to
+	
+	$HOME/p
+	
+	The parent symlinks are not necessary for walking around the
+	directories using a shell, because then "cd .." can be used for about
+	the same purpose.
+	
+	However, the "parent"-symlinks must be used if the user wants to
+	create symlinks himself or herself in order to access the parent
+	directory of a p/p$N directory, because ".." will not work for
+	relative symlinks in this case.
+	
+	This tool requires that user root is a member of all existing
+	encryption levels. To be more specific, this tool will examine root's
+	$HOME/p, $HOME/p/p2 and so on in order to find out where the base
+	directories for the various encryption levels are located within the
+	filesystem.
+	
+	It does *not* assume that the $HOME of root is a parallel directory of
+	all the other user's $HOMEs.
+	
+	But it does assume that all the p, p2 and higher-level directories for
+	root are parallel directories of those of all the other users.
+	
+	When creating the "p", "p2", ... and "parent" symlinks, this tool will
+	always create relative symlinks except if the root of the file system
+	will be reached when following such symlinks; in those cases it will
+	create absolute symlinks instead.
+	
+	This tool can not only create the the directories and symlinks
+	mentioned above for the given user, but can also fix any outdated
+	symlinks.
+	
+	Although this tool is named "promote-user", it can actually also be
+	used for degrading a user by specifying a lower encryption level than
+	currently assigned to the user.
+	
+	In such cases, only the group memberships of the user will be removed,
+	but neither the symlinks or existing directories will be removed
+	(although they might be inaccessible to the user then).
+	
+	Usage: promote-user [ <options> ] <user>
+	
+	<user>: The name of the user to be promoted.
+
+	options:
+	--help, -h: Display this help text.
+	--verbose, -v: Verbose operation.
+	--dry-run, --simulate, -n:
+	  Just print what would be done, but don't actually do anything.
+	--level <N>, -l <N>:
+	  An integer >= 1 specifying the allowed maximum encryption level for
+	  the user. If this option is *not* specified, the maximum level for
+	  this user is derived from his or her membership in the
+	  highest-numbered level<N> group.
+	  If this option *is* specified, the user's membership with the
+	  level<N> groups will be asserted or retracted as required in order
+	  to match the specified level.
+	  If a level of 0 is specified, all level$N memberships will
+	  be retracted from the user.
+
+	Version 1.0
+	Written by Guenther Brunthaler in 2007.
+.
+}
+
+
+eecho() {
+	echo "$*" >& 2
+}
+                                                                                                                             
+
+die() {
+	eecho "ERROR: $*"
+	eecho "Use $0 --help for help."
+	exit 1
+}
+
+
+run() {
+	$COMMAND_PREFIX "$@" && return
+	die "Execution of >>>$*<<< failed with return code $?!"
+}
+
+
+runalw() {
+	local COMMAND_PREFIX
+	run "$@"
+}
+
+
+info() {
+	test -z "$VERBOSE" && return
+	eecho "$*"
+}
+                                                        
+
+# Start of command line processing.
+# Define presets.
+VERBOSE=
+COMMAND_PREFIX=
+LEVEL=
+#
+COPTS=
+while true; do
+	if [ -z "$COPTS" ]; then
+		case "$1" in
+			-?*) COPTS="$1"; shift;;
+			*) break;;
+		esac
+	fi
+	if [ "${COPTS#--}" = "$COPTS" ]; then
+		TAIL="${COPTS#-?}"; # Switch custering.
+		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
+	else
+		COPT="$COPTS"; COPTS=
+	fi
+	# Any arguments are at $1 and onwards; must be shifter off.
+	case "$COPT" in
+		--) break;; # Must be first!
+                --help | -h) usage; exit;;
+		--version)
+			# Sychronize this with the usage text!
+			echo "Version 1.0"
+			exit;;
+		--verbose | -v) VERBOSE=1;;
+		--dry-run | --simulate | -n) COMMAND_PREFIX="eecho EXEC:";;
+		--level | -l) LEVEL="$1"; shift;;
+		*) die "Unknown option '$COPT'!";; # Must be last!
+	esac
+done
+# Shift off ordinal arguments. Required arguments first.
+test $# -ge 1 || die "Missing argument - <user>!"
+USER="$1"; shift
+# Optional arguments.
+#test $# -ge 1 && { WORKDIR="$1"; shift; }
+# Check for excess arguments.
+test $# = 0 || die "Unexpected excess arguments: $*"
+# End of command line processing.
+# Determine list of levels the user is already a member of.
+USERLEVELS="$(
+	LC_ALL=C runalw id "$USER" | cut -d" " -f3 | cut -d= -f2- \
+	| { IFS=,; while read G; do printf "%s\n" $G; done; } \
+	| sed -e 's/^[0-9]*('$LEVEL_PREFIX'\([0-9]*\))$/\1/;t;d' \
+	| LC_ALL=C sort -n
+)"
+# Determine target level.
+if [ -z "$LEVEL" ]; then
+	LEVEL="$( printf %s "$USERLEVELS" | tail -n1)";
+	if [ -n "$LEVEL" ]; then
+		info "User is currently at $LEVEL_PREFIX$LEVEL."
+	else
+		LEVEL=0
+		info "User is currently not a member of any encryption level."
+	fi
+fi
+# Add or remove level memberships as required for the target level.
+printf "%s\n" "$USERLEVELS" | {
+	# Note that this will be executed in a subshell because of piping.
+	LOWER=1 # Lowest level not yet processed.
+	while read L; do
+		if [ "$L" -le "$LEVEL" ]; then
+			# Add any levels from $LOWER to $L - 1.
+			# (Level $L itself is already set.)
+			while [ $LOWER -lt $L ]; do
+				info "Adding user '$USER' to" \
+					"group '$LEVEL_PREFIX$LOWER'."
+				run gpasswd -a \
+					"$USER" "$LEVEL_PREFIX$LOWER"
+				((LOWER= LOWER + 1))
+			done
+			((LOWER= L + 1))
+		else
+			# Remove outdated membership for level.
+			info "Removing user '$USER' from" \
+				"group '$LEVEL_PREFIX$L'."
+			run gpasswd -d "$USER" "$LEVEL_PREFIX$L"
+			((LOWER= L + 1))
+		fi
+	done
+	while [ $LOWER -le $LEVEL ]; do
+		info "Adding user '$USER' to group '$LEVEL_PREFIX$LOWER'."
+		run gpasswd -a "$USER" "$LEVEL_PREFIX$LOWER"
+		((LOWER= LOWER + 1))
+	done
+}
+# Create p/p$N directories and symlinks for all active levels.
+L=1
+while [ $L -le $LEVEL ]; do
+	echo processing level$L
+	((L= L + 1))
+done

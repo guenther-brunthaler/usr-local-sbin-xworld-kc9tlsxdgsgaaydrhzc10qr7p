@@ -1,0 +1,42 @@
+#!/bin/sh
+# Edits LILO config file and then runs LILO if necessary.
+# Also touches the password hash file (if one exists)
+# so that it will not become necessary to enter
+# the boot loader password again.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/edlilo $
+# $Author: root $
+# $Date: 2007-04-25T09:27:22.905033Z $
+# $Revision: 644 $
+
+CONFIG_FILE="/etc/lilo.conf"
+PASSWORD_HASH="${CONFIG_FILE}.shs"
+LILO="/sbin/lilo"
+TOUCH="/usr/bin/touch"
+RLOG="/usr/bin/rlog"
+CI="/usr/bin/ci"
+
+pdolm() {
+	stat -c%Y "$1"
+}
+rcs_ctrl() {
+	test -e "$CI" -a -e "$RLOG" && "$RLOG" -t "$1" &> /dev/null
+}
+if [ -z "$EDITOR" ]; then
+	echo "No editor defined!"
+	exit 1
+fi
+if [ -e "$CONFIG_FILE" ]; then
+	BEFORE=`pdolm "$CONFIG_FILE"`
+else
+	BEFORE=
+fi
+if "$EDITOR" "$CONFIG_FILE" && [ `pdolm "$CONFIG_FILE"` != "$BEFORE" ]; then
+	if rcs_ctrl "$CONFIG_FILE"; then
+		echo -n ""
+	fi
+	if [ -e "$PASSWORD_HASH" ]; then
+		"$TOUCH" "$PASSWORD_HASH"
+	fi
+	"$LILO"
+fi

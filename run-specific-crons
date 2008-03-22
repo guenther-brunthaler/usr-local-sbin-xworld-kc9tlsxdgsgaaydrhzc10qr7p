@@ -1,0 +1,26 @@
+#!/bin/sh
+# Run cron jobs in the named $CRONDIR (see below).
+# Skips subdirectories (such as RCS) and only
+# executes jobs that have the execute permission bit set.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/run-specific-crons $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:52:19.215260Z $
+# $Revision: 219 $
+
+
+for CRONDIR in /etc/cron.$1 /usr/local/etc/cron.d/$1; do
+	test -d $CRONDIR || exit
+	set +e
+	for SCRIPT in $CRONDIR/*; do
+		if [ -x $SCRIPT -a ! -d $SCRIPT ]; then
+			$SCRIPT
+			RC=$?
+			if [ $RC != 0 ]; then
+				/usr/bin/logger -p cron.err -t $0 \
+					"$SCRIPT failed with return code $RC"
+			fi
+		fi
+	done
+done
+exit 0

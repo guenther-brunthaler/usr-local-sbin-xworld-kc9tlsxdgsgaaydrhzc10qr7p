@@ -1,0 +1,28 @@
+#!/bin/sh
+# Rescans the flash memory card slots in the HiSpeed 8-in-1 USB card reader.
+# This will detect inserted or removed cards, which allows UDEV to
+# update the associated /dev entries accordingly.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/rescan-8-in-1 $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:54.910622Z $
+# $Revision: 211 $
+
+
+# Only devices associated with mount points that have the following string
+# as a prefix will be scanned.
+PREFIX="/media/8-in-1/"
+SCAN="/usr/bin/sg_scan"
+
+
+exec < /etc/fstab
+echo "Rescanning USB card reader slots."
+while read DEV MP REST; do
+	STRIPPED="${MP#$PREFIX}"
+	if [ "$PREFIX$STRIPPED" = "$MP" ]; then
+		DEV="${DEV%-part*}"
+		"$SCAN" "$DEV" > /dev/null || {
+			echo "Cannot scan '$DEV'"
+		}
+	fi
+done

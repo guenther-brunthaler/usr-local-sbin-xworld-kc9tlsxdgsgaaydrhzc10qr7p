@@ -1,0 +1,9 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/cvspserver $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+TARGET="/srv/cvs/runserver"
+exec "$TARGET"
+/usr/bin/logger -p local5.err -t cvspserver "Could not launch \"$TARGET\": Return code $?. (Perhaps not mounted?)"

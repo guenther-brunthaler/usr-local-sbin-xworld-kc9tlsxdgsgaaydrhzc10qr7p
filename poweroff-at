@@ -1,0 +1,8 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/poweroff-at $
+# $Author: root $
+# $Date: 2007-07-12T11:01:57.315888Z $
+# $Revision: 828 $
+
+
+nohup shutdown -hP "${1:?Missing HH:MM shutdown time!}" > /dev/null 2>& 1 &

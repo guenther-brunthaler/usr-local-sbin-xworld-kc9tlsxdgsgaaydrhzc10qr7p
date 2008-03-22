@@ -1,0 +1,80 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/set-performance $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+
+STATE_FILE=/var/run/performance-status
+CPUFRQSET=/usr/bin/cpufreq-set
+SPICCTRL=/usr/bin/spicctrl
+DEFAULT_BRIGHTNESS=95
+
+
+# Sets REPLY to a space-separated string of required modules
+# for the specified state.
+state_modules() {
+	case $1 in
+		normal) REPLY=cpufreq_ondemand;;
+		min) REPLY=cpufreq_powersave;;
+		smooth) REPLY=cpufreq_conservative;;
+	esac
+}
+
+
+
+brightness() {
+	[[ $OPT_VERBOSE ]] && echo "Setting LCD brightness to $1."
+	$SPICCTRL -b $1 || {
+		echo "Cannot set LCD brightness!" > /dev/stderr
+	}
+}
+
+
+
+activate() {
+	initialize_state
+	[[ $OPT_VERBOSE ]] && echo "Activating $1 governor."
+	$CPUFRQSET -g $1
+	brightness ${2:-$DEFAULT_BRIGHTNESS}
+}
+
+
+source /usr/local/sbin/functions/module_loader.sh || exit 1
+while getopts v OPT; do
+	case $OPT in
+		v) OPT_VERBOSE=1;;
+		?) exit 1;;
+	esac
+done
+shift $(($OPTIND - 1))
+NEW_STATE="$1"
+(( $# == 1 )) || NEW_STATE=
+SUPPORTED="default normal full bright smooth min"
+for ((;;)) do
+	case $NEW_STATE in
+		default)
+			NEW_STATE=full;;
+		normal)
+			activate ondemand 85
+			break;;
+		smooth)
+			activate conservative 85
+			break;;
+		full)
+			activate performance 85
+			break;;
+		bright)
+			activate performance
+			break;;
+		min)
+			activate powersave 50
+			break;;
+		*)
+			select NEW_STATE in $SUPPORTED "(cancel)"; do
+				[[ $NEW_STATE == "(cancel)" ]] && exit 1
+				break
+			done;;
+	esac
+done
+complete_state

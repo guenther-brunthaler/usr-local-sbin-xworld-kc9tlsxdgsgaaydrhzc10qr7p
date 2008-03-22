@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+# Create the $HOME/p, $HOME/p/p2 etc symlinks and directories as well as
+# the associated $HOME/p/parent etc directories for all users
+# that are members of levelN groups.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/apply-levels $
+# $Author: root(xvaio) $
+# $Date: 2006-11-09T04:24:45.948642Z $
+# $Revision: 379 $
+
+
+use strict;
+use ShellCmd_1A7E54C0_9EFF_11D9_BFF3_00A0C9EF1631;
+
+
+my $level_mnt= '/var/local/lib/truecrypt/mnt/level%u';
+my $home_base= '/home/users/%s';
+my $group_base= '/home/groups/%s';
+
+
+my(%u, $u, $sh, $nlev);
+$sh= new Lib::ShellCmd;
+{
+   my($name, $level, $members);
+   while (($name, undef, undef, $members)= getgrent) {
+      next unless ($level)= $name =~ /^level(\d+)$/;
+      foreach $u (split /\s+/, $members) {
+         ($u{$u}||= {})->{$level}= 1;
+      }
+   }
+   endgrent;
+}
+{
+   my($i);
+   # Determine maximum level and verify level consistency.
+   foreach $u (sort {lc($a) cmp lc $b} keys %u) {
+      $i= 1;
+      foreach (sort {$a <=> $b} keys %{$u{$u}}) {
+         if ($i != $_) {
+            warn "Adding level$i membership for user $u";
+            $sh->call('gpasswd', '-a', $u, "level$i");
+         }
+         ++$i;
+      }
+      die if --$i <= 0;
+      $u{$u}= $i;
+      $nlev= $i if !$nlev || $nlev < $i;
+   }
+}
+# Verify or create level directory structure.
+{
+   my(%mp, $level_base);
+   open IN, '/proc/mounts' or die "Cannot open /proc/mounts: $!";
+   while (defined($_= <IN>)) {
+      next unless /^
+         \S+ \s+ # Device.
+         (.*?) \s+ # Mount point.
+         \S+ \s+ # Filesystem type.
+         \S+ \s+ # Mount options.
+         \d+ \s+ # Filesystem checking frequency.
+         \d+ \s* # Pass.
+      $/x;
+      $mp{$1}= 1;
+   }
+   close IN or die $!;
+   for (my $lv= 1; $lv <= $nlev; ++$lv) {
+      $level_base= sprintf $level_mnt, $lv;
+      die "$level_base is not mounted" unless $mp{$level_base};
+   }
+}

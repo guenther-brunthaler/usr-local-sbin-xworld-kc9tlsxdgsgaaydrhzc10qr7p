@@ -1,0 +1,136 @@
+#! /bin/sh
+# Mount a CDROM volume using appropriate options.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/iso9660mount $
+# $Author: root $
+# $Date: 2007-05-30T21:17:40.766801Z $
+# $Revision: 758 $
+
+
+MOPT_ISO9660="utf8,uid=operator,gid=plugdev,ro,mode=0550"
+
+
+usage() {
+	cat <<- "."
+	iso9660mount - mount CD-ROM ISO-9660 volume using appropriate options
+	
+	Uses the correct options for setting character set translation,
+	owner, group, etc.
+
+	Usage: iso9660mount [ options ] <device> <mount_point_directory>
+	
+	<device>:
+	  The device or image file containg the volume data
+	  of the ISO-9660 file system.
+	  If it is a file rather than a block special device,
+	  'loop' will automatically be added to the default
+	  options.
+
+	options:
+	--help, -h: Display this help text.
+	--verbose, -v: Verbose operation.
+	--dry-run, --simulate, -n:
+	  Just print what would be done, but don't actually
+	  do anything.
+	--create-mountpoint, -c, -m:
+	  If the mount point directory does not yet exist,
+	  it will be created using the provided path name.
+	--options, -o <more_options>:
+	  Will be added to the list auf default options.
+	  Can be used to specify additional mount options
+	  such "remount" which will not be used by default.
+
+	Version 1.0
+	Written by Guenther Brunthaler in 2007.
+.
+}
+                                                                                                                             
+
+die() {
+	{
+		echo "ERROR: $*"
+		echo "Use $0 --help for help."
+	} >& 2
+	exit 1
+}
+                                                        
+
+# Start of command line processing.
+# Define presets.
+VERBOSE=0
+DRY=0
+MAKE_MP=0
+ADD_OPT=
+#
+COPTS=
+while true; do
+	if [ -z "$COPTS" ]; then
+		case "$1" in
+			-?*) COPTS="$1"; shift;;
+			*) break;;
+		esac
+	fi
+	if [ "${COPTS#--}" = "$COPTS" ]; then
+		TAIL="${COPTS#-?}"; # Switch custering.
+		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
+	else
+		COPT="$COPTS"; COPTS=
+	fi
+	# Any arguments are at $1 and onwards; must be shifter off.
+	case "$COPT" in
+		--) break;; # Must be first!
+                --help | -h) usage; exit;;
+		--version)
+			# Sychronize this with the usage text!
+			echo "Version 1.0"
+			exit;;
+		--verbose | -v) VERBOSE=1;;
+		--dry-run | --simulate | -n) DRY=1;;
+		--options | -o) ADD_OPT="$1"; shift;;
+		--create-mountpoint | -c | -m) MAKE_MP=1;;
+		*) die "Unknown option '$COPT'!";; # Must be last!
+	esac
+done
+# Shift off ordinal arguments. Required arguments first.
+test $# -ge 1 || die "Missing argument - <device>!"
+DEVICE="$1"; shift
+test $# -ge 1 || die "Missing argument - <mount_point_directory>!"
+MOUNT_POINT="$1"; shift
+# Optional arguments.
+#test $# -ge 1 && { WORKDIR="$1"; shift; }
+# Check for excess arguments.
+test $# = 0 || die "Unexpected excess arguments: $*"
+# End of command line processing.
+CPFX=
+test $DRY = 1 && CPFX=echo
+OPT="$MOPT_ISO9660"
+OPT="$OPT${ADD_OPT:+,}$ADD_OPT"
+if [ ! -b "$DEVICE" ]; then
+	if [ -f "$DEVICE" ]; then
+		OPT="$OPT${OPT:+,}loop"
+	else
+		die "'$DEVICE' is neither an image file" \
+			" nor a block special device!"
+	fi
+fi
+if [ -e "$MOUNT_POINT" ]; then
+	if [ ! -d "$MOUNT_POINT" ]; then
+		die "Mount point '$MOUNT_POINT' is not a directory!"
+	fi
+elif [ "$MAKE_MP" -ne 0 ]; then
+	if ! $CPFX mkdir "$MOUNT_POINT"; then
+		die "Cannot create mount point directory '$MOUNT_POINT'!"
+	fi
+	if ! $CPFX chown nobody:nogroup "$MOUNT_POINT"; then
+		die "Cannot set owner for mount point '$MOUNT_POINT'!"
+	fi
+	if ! $CPFX chmod 0 "$MOUNT_POINT"; then
+		die "Cannot set permissions for mount point '$MOUNT_POINT'!"
+	fi
+else
+	die "Mount point '$MOUNT_POINT' does not exist!"
+fi
+if ! $CPFX mount -o"$OPT" "$DEVICE" "$MOUNT_POINT"; then
+	die "Could not mount '$DEVICE' as '$MOUNT_POINT'!"
+fi
+test -n "$VERBOSE" && echo "Successfully mounted!"

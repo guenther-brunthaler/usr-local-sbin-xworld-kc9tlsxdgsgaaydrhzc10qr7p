@@ -1,0 +1,67 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/set-script-value $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:52:13.722811Z $
+# $Revision: 217 $
+
+
+HELPER="/usr/local/bin/functions/lookup.sh"
+HELPER_VERSION="1"
+
+
+die() {
+	echo "ERROR: $1" >& 2
+	exit 1
+}
+
+
+info() {
+	test -z "$VERBOSE" && return
+	echo "$1" >& 2
+}
+
+
+VERBOSE=
+OPTS="--version $HELPER_VERSION"
+while true; do
+	case "$1" in
+		-v|--verbose) VERBOSE=1;;
+		-k|--key)
+			shift
+			OPTS="$OPTS --key \"$1\""
+			;;
+		*) break
+	esac
+	shift
+done
+SCRIPT="$1"; shift
+test $# -eq 1 -o $# -eq 2 || {
+	echo "Usage: $0 [ options ] <script> <key> [ <value> ]"
+	echo "If the <value> argument is missing (rather than just being"
+	echo "an empty string), the associated setting will be deleted"
+	echo "and querying for that value will yield an error."
+	echo "Options:"
+	echo "-v, --verbose: Enable additional diagnostic messages."
+	echo "-k <skey>, --key <skey>:"
+	echo " Set value for a foreign system named '<skey>'."
+	exit 1
+} >& 2
+KEY="$1"; shift
+HAVE_VAL=
+test $# = 1 && HAVE_VAL=1
+VALUE="$1"
+OPTS="$OPTS --script \"$SCRIPT\""
+eval ". \"$HELPER\" $OPTS \"$KEY\" --from filename --into SF"
+BASE="${SF%/*}"
+test "$BASE" = "$SF" && die "Could not look up key '$KEY'!"
+test -d "$BASE" || die "Settings base directory '$BASE' does not exist!"
+if [ -z "$VALUE" -a -z "$HAVE_VAL" ]; then
+	info "Removing settings file '$SF'."
+	if [ -f "$SF" ]; then
+		rm "$SF" || die "Cannot remove settings file '$SF'!"
+	fi
+else
+	info "Writing value '$VALUE' to settings file '$SF'."
+	printf "%s\n" $VALUE > "$SF" || \
+		die "Could not write value '$VALUE' to settings file '$SF'!"
+fi

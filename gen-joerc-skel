@@ -1,0 +1,291 @@
+#!/usr/bin/perl -w
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/gen-joerc-skel $
+# $Author: root $
+# $Date: 2007-08-21T19:55:18.464591Z $
+# $Revision: 907 $
+
+
+my @joerc_files= (
+   {
+        original => '/etc/joe/joerc'
+      , critical => 1
+      , modified_target => '/usr/local/etc/skel/.joerc'
+   }, {
+        original => '/etc/joe/ftyperc'
+      , modified_target => '/usr/local/etc/skel/.joe'
+   }
+);
+my $begin_modification_tag= ' # *** BEGIN CHANGES BLOCK';
+my $end_modification_tag= ' # *** END CHANGES BLOCK';
+# Frequently used variants. Use 'USER_' prefix.
+my $USER_prog= << '.';
+   -indentc 32
+   -istep 3
+   -spaces
+.
+my $USER_prog_x= << '.' . $USER_prog;
+   -tab 3
+.
+my $USER_nowrap= '--wordwrap';
+my $USER_pnowrap= << "." . $USER_prog;
+   $USER_nowrap
+.
+my $USER_NEWSTUFF= << "." . $USER_prog_x;
+   \40
+    Completely new entries.
+   \40
+    TCL via shabang
+    (According to FHS 2.3, the following
+    executables must at least have a symlink in
+    /usr/bin if they are installed at all.)
+   *
+   +#!\\+\\[ \t]\\+\\[a-z/]/tclsh\\>
+   +#!\\+\\[ \t]\\+\\[a-z/]/wish\\>
+   +#!\\+\\[ \t]\\+\\[a-z/]/expect\\>
+   -autoindent
+   -syntax tcl
+.
+my $USER_RUBY= << "." . $USER_prog_x;
+   +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
+.
+# What to change.
+my @changes= (
+   # Format: An anonymous hash for each change.
+   # Hash keys:
+   # trigger => $SINGLE_STRING
+   # trigger => $STRING_ARRAY
+   #  Where to start searching for an empty line.
+   #  Will be matched against beginning of each line.
+   #  Will match only if followed by whitespace or EOL.
+   #  The text to add will be inserted before the
+   #  first empty line following the matching line,
+   #  enclosed in tag lines.
+   #  If the value for 'trigger' is an anonymous array
+   #  rather than a string, multiple triggers may be
+   #  specified, and the same actions occurs for every
+   #  trigger.
+   #  Each trigger will only match the first time.
+   # add => $MULTILINE_STRING
+   #  The text to add. An arbitrary number of
+   #  full lines, each terminated by a newline.
+   #  The newline of the last line is optional and
+   #  will be automatically added if missing.
+   #  The minimum indentation of all lines is determined
+   #  and will be stripped off all lines.
+   #  The text may contain references to environment
+   #  variables of the form $NAME or ${NAME}.
+   #  "$" alone can be quoted as "$$".
+   # insert => $MULTILINE_STRING
+   #  The text to be inserted directly after the
+   #  trigger. Same format as for "add".
+   #  This text will, however, not become part of the
+   #  buffer to be used for "duplicate".
+   # duplicate => $SINGLE_STRING
+   # duplicate => $STRING_ARRAY
+   #  A string or anonymous array of strings.
+   #  When the first trigger for a hash matches,
+   #  and the text has been added, the whole section
+   #  following the trigger line until the first empty line
+   #  (after the added text) will be copied to a buffer.
+   #  Then, for each string in the duplicates,
+   #  that buffer will be added, prefixed by an empty line
+   #  followed by a line containing only the duplicate text.
+     {trigger => ' -backpath', add => << '.'}
+      -backpath $HOME/.editor-backups
+.
+   , {trigger => ' -break_links', add => << '.'}
+       Although this would be nice in order to break hard links,
+       it unfortunately also breaks symlinks, rendering this
+       feature rather useless.
+      --break_links
+.
+   , {trigger => "*", add => $USER_nowrap}
+   , {trigger => '-istep 2', add => << '.'}
+       # ANSI-Tab text file as global default.
+      --guess_indent
+      -smarthome
+      -indentfirst
+      -istep 1
+      -indentc 9
+      -rmargin 79
+      -french
+.
+   , {
+      trigger => [
+           "+#!\\+\\[ \t]\\+\\[a-z/]/perl\\>"
+           , qw/*.pl *.pm/
+      ], add => $USER_prog
+   }
+   , {trigger => [qw/*.tex *.sty/], add => $USER_pnowrap}
+   , {trigger => [qw/*.asm *.s *.S/], add => $USER_nowrap}
+   , {trigger => [qw/*.sml *.ml *.mli/], add => $USER_prog}
+   , {trigger => [qw/*.c *.h/], add => $USER_prog}
+   , {
+      trigger => [qw/*.cpp *.c++ *.hpp *.h++/]
+      , duplicate => [qw/*.cxx *.C *.hxx *.inl/]
+      , add => $USER_prog
+   }
+   , {trigger => [qw/*.v *.vh/], add => $USER_prog}
+   , {trigger => [qw/*.vhd/], add => $USER_prog}
+   , {trigger => [qw/*.java/], add => $USER_prog}
+   , {trigger => [qw/*.php/], add => $USER_prog}
+   , {
+      trigger => "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"
+      , insert  => "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
+      , add  => $USER_prog
+   }
+   , {trigger => "*.py", add => $USER_prog}
+   , {trigger => [qw/*.lisp *.lsp/], add => $USER_prog}
+   , {trigger => [qw/*.el/], add => $USER_prog}
+   , {trigger => [qw/*.p *.pas/], add => $USER_prog}
+   , {trigger => [qw/*.f *.for *.FOR/], add => $USER_prog}
+   , {trigger => [qw/*.y/], add => $USER_prog}
+   , {trigger => [qw/*.l/], add => $USER_prog}
+   , {trigger => [qw/*.tcl/], add => $USER_prog_x}
+   , {trigger => [qw/*.ac/], add => $USER_prog}
+   , {trigger => [qw/*.m4/], add => $USER_prog}
+   , {trigger => [qw/*.am/], add => $USER_prog}
+   , {trigger => [qw/*.sql/], add => $USER_prog}
+   , {trigger => [qw/*.xml/], add => $USER_pnowrap}
+   , {trigger => [qw/*.xsd/], add => $USER_pnowrap}
+   , {trigger => [qw/*.htm/], add => $USER_pnowrap}
+   , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
+   , {trigger => "*.rb", add => $USER_RUBY}
+);
+
+
+use strict;
+
+
+# Regex catching any of the triggers.
+sub globrx(\@) {
+   my $changes= shift;
+   my $any= join '|', map "(?:$_)", map @{$_->{trigger}}, @$changes;
+   return qr/$any/;
+}
+
+
+my($c, $i, $any, $st, $k, $t);
+foreach ($begin_modification_tag, $end_modification_tag) {
+   $_= "$_\n";
+}
+# Preprocess @changes.
+foreach $c (@changes) {
+   my(@lines, $j);
+   # Keys which must exist.
+   foreach $k (qw/trigger add/) {
+      unless (exists $c->{$k}) {
+         die "Missing key '$k' in \@changes entry!";
+      }
+   }
+   # Keys for values to be coerced into arrays of strings.
+   foreach $k (qw/trigger duplicate/) {
+      unless (exists $c->{$k}) {$c->{$k}= []}
+      elsif (!ref $c->{$k}) {$c->{$k}= [$c->{$k}]}
+   }
+   foreach $k (@{$c->{trigger}}) {
+      $t= quotemeta $k;
+      $k= qr/ ^ $t (?: \s | $ ) /x;
+   }
+   if (@{$c->{duplicate}}) {
+      $c->{buffer}= '';
+      $c->{collecting}= 1;
+   }
+   foreach $j (qw/add insert/) {
+      $t= $c->{$j} or next;
+      chomp $t;
+      @lines= split '\n', $t, -1;
+      OUTER: for ($i= 1;; ++$i) {
+         undef $t;
+         foreach $k (@lines) {
+            last OUTER if length($k) < $i;
+            unless (defined $t) {
+               $t= substr $k, 0, $i;
+               last OUTER unless $t =~ /\s$/;
+               next;
+            }
+            last OUTER if substr($k, 0, $i) ne $t;
+         }
+      }
+      --$i;
+      $c->{$j}= join "\n", map(substr($_, $i), @lines), '';
+      $c->{$j} =~ s<
+         \$
+         (?:
+            \{ (\w+) \}
+            | (\w+)
+            | \$
+         )
+      ><
+         $1 || $2 ? $ENV{$1 || $2} : '$'
+         or die "Undefined \$ENV{" . ($1 || $2) . "}"
+      >gex;
+   }
+}
+$any= globrx @changes;
+# Convert the files.
+foreach my $joerc (@joerc_files) {
+   unless (open IN, '<', $joerc->{original}) {
+      next unless $joerc->{critical};
+      die "Cannot open original '$joerc->{original}' input file: $!";
+   }
+   open OUT, '>', $joerc->{modified_target}
+      or die "Cannot create '$joerc->{modified_target}' output file: $!"
+   ;
+   $st= 0;
+   while (defined($_= <IN>)) {
+      if ($st == 0) {
+         # Just normally copying lines.
+         if ($any && /$any/) {
+            # Some trigger matches.
+            undef $c;
+            SEARCH: foreach $t (@changes) {
+               for ($i= @{$t->{trigger}}; $i--; ) {
+                  if (/$t->{trigger}->[$i]/) {
+                     $c= $t;
+                     splice @{$t->{trigger}}, $i, 1;
+                     $any= globrx @changes;
+                     last SEARCH;
+                  }
+               }
+            }
+            unless ($c) {
+               undef $any;
+               next;
+            }
+            $st= exists $c->{insert} ? 2 : 1;
+         }
+      } elsif ($st == 1) {
+         # Within triggered section.
+         if (/^\s*$/) {
+            # End of triggered section found.
+            $t= $c->{add};
+            $c->{buffer}.= $t if $c->{collecting};
+            print OUT $begin_modification_tag . $t . $end_modification_tag;
+            if (@{$c->{duplicate}}) {
+               die unless defined $c->{buffer};
+               foreach $k (@{$c->{duplicate}}) {
+                  print OUT
+                     "$begin_modification_tag\n$k\n"
+                     . $c->{buffer} . $end_modification_tag
+                  ;
+               }
+               undef $_ foreach $c->{buffer}, $c->{collecting};
+               $c->{duplicate}= [];
+            }
+            $st= 0;
+         } elsif ($c->{collecting}) {
+            $c->{buffer}.= $_;
+         }
+      } elsif ($st == 2) {
+         # After triggered line.
+         print OUT
+            $begin_modification_tag . $c->{insert} . $end_modification_tag
+         ;
+         $st= 1;
+      }
+      print OUT $_;
+   }
+   close OUT or die "Cannot finish writing '$joerc->{modified_target}': $!";
+   close IN or die $!;
+}

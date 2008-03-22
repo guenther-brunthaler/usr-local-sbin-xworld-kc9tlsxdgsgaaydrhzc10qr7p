@@ -1,0 +1,86 @@
+#!/bin/sh
+trap "" INT QUIT TSTP
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/bootprompt-launch $
+# $Author: root(xtreme) $
+# $Date: 2006-08-24T06:38:16.700353Z $
+# $Revision: 241 $
+
+
+# The following text will be output at the beginning
+# of every text line at the console.
+INDENT="   "
+
+
+# $1: "info" || "err" || "warning".
+# $2 .. $N: Msg.
+log() {
+	local SEVERITY
+	SEVERITY="$1"; shift
+	logger -p "user.$SEVERITY" -t "${0##*/}" "$*"
+}
+
+
+puts() {
+	echo "${INDENT}$*"
+}
+
+
+die() {
+	puts "ERROR running '$0': $*" >& 2
+	log err "$*"
+	exit 1
+}
+
+
+# $1: Severity for syslog
+# $2: "" or prefix for console message.
+# $3 - $N: Message.
+inform() {
+	local SEVERITY PREFIX
+	SEVERITY="$1"; shift
+	PREFIX="$1"; shift
+	puts "$PREFIX${PREFIX:+: }$*"
+	log "$SEVERITY" "$*"
+}
+
+
+TIMEOUT=10
+while [ -n "$1" ]; do
+	case "$1" in
+		--timeout) TIMEOUT="$2"; shift;;
+		*) break;;
+	esac
+	shift
+done
+if [ "$#" = 0 ]; then
+	die "Missing pathname of application to run!"
+fi
+PROG="$1"; shift
+test "$#" = 0 || die "Too many arguments!"
+test -f "$PROG" || die "Cannot locate application '$PROG'!"
+test -x "$PROG" || die "'$PROG' is not executable!"
+puts "You have the option to run \"$PROG\" now."
+puts "If no answer is provided within $TIMEOUT seconds, 'no' is assumed."
+read -t "$TIMEOUT" -p "${INDENT}Run it now [Yn]? " REPLY || {
+	echo "(timeout)"
+	REPLY=no
+}
+test -z "$REPLY" && REPLY=yes
+while true; do
+	case "$REPLY" in
+		yes | Yes | y | Y | ja | Ja | j | J) break;;
+	esac
+	puts "Skipping execution of \"$PROG\"."
+	exit
+done
+puts "Launching \"$PROG\"..."
+log info "Launching \"$PROG\" on user request (interactive)."
+if "$PROG"; then
+	inform info "" "Run of \"$PROG\" completed successfully."
+else
+	inform warning "WARNING" \
+		"Run of \"$PROG\" failed with return code $?!"
+	read -t "$TIMEOUT" -p "${INDENT}Press Enter to continue. " || {
+		echo "(timeout)"
+	}
+fi

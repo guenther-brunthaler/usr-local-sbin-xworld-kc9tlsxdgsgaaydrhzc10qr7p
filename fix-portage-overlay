@@ -1,0 +1,48 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/fix-portage-overlay $
+# $Author: root $
+# $Date: 2007-09-05T21:05:17.698973Z $
+# $Revision: 935 $
+
+
+# Creates/updates symlinks from PORTAGE_DISTDIRS
+# to all files in $LOCAL_DISTDIR.
+# Then recreates manifests for all files in $LOCAL_OVERLAY,
+# unless the option "--link-only" / "-l" is specified which skips this step.
+
+
+# Where your local ebuild are stored.
+LOCAL_OVERLAY=/usr/local/portage
+# Where your local distribution archives are stored.
+LOCAL_DISTDIR=$LOCAL_OVERLAY/distfiles
+# Where portage puts its distribution archives
+PORTAGE_DISTDIR=/usr/portage/distfiles
+
+
+# Returns unique file system object id string or
+# 0 if there is no such object.
+# Symlinks are followed.
+fid() {
+	if [ -e "$1" ]; then
+		stat -Lc%d.%i "$1"
+	else
+		echo 0
+	fi
+}
+
+
+find "$LOCAL_DISTDIR" -mindepth 1 -maxdepth 1 -type f \
+	| while read ODFILE; do
+		PDFILE=$PORTAGE_DISTDIR/${ODFILE##*/}
+		if [ `fid "$ODFILE"` != `fid "$PDFILE"` ]; then
+			echo "Symlinking to '$PDFILE'."
+			ln -snf "$ODFILE" "$PDFILE"
+		fi
+	done
+test -n "$1" && exit
+find "$LOCAL_OVERLAY" -mindepth 3 -maxdepth 3 -name '*.ebuild' \
+	| while read EBUILD; do
+		if ! ebuild "$EBUILD" fetch; then
+			ebuild "$EBUILD" manifest
+		fi
+	done

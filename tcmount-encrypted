@@ -1,0 +1,103 @@
+#! /bin/sh
+#
+# (c) 2008 by Guenther Brunthaler.
+
+
+die() {
+	echo "ERROR: $*" >& 2
+	exit 1
+}
+
+
+run() {
+	"$@" && return
+	die "Cannot execute >>>$*<<<: Return code ${?}!"
+}
+
+
+wrout() {
+	if test $# = 0; then
+		fmt -w `tput cols`
+	else
+		printf "%s\n" "$*" | wrout
+	fi
+}
+
+
+chksum() {
+	run md5sum -b | run cut -d' ' -f1
+}
+
+
+find_file() {
+	find "$DIR" -type f -name "*.hdr" | while read FILE; do
+		CHK=`chksum < "$FILE"`
+		if test x$CHK = x$MD5SUM; then
+			printf "%s\n" "$FILE"
+			break
+		fi
+	done
+}
+
+
+find_tc_slots() {
+	truecrypt -l 2> /dev/null | sed -e '
+		/truecrypt[0-9]/ {
+			s/[^ ]*truecrypt\([0-9]*\).*/\1/
+			p
+		}
+		d
+	'
+}
+
+
+find_free_tc_slot() {
+	truecrypt -l 2> /dev/null | awk '
+		{
+			if (match($1, "truecrypt([0-9]*)", m)) s[m[1]]= 1
+		}
+		END {
+			srand()
+			for (dim= 100; dim < 10000; dim*= 10) {
+				b= int(rand() * (dim - 1)) + 1
+				for (i= b + 1; i != b; ++i) {
+					if (i >= dim) i= 1;
+					if (!(i in s)) {
+						print i
+						exit
+					}
+				}
+			}
+			print "No empty slots!" > "/dev/stderr"
+			exit 1
+		}
+	'
+}
+
+
+DEV=${1?Usage: /dev/<tc_container_device>}
+run test -b "$DEV"
+MD5SUM=`
+	truecrypt --backup-headers /dev/stderr "$DEV" 2>& 1 > /dev/null \
+		| chksum
+`
+PWLIST="$HOME/.pwlist"
+run test -f "$PWLIST"
+PWLIST=`run readlink --canonicalize-existing "$PWLIST"`
+DIR=`run dirname "$PWLIST"`
+DIR=`run readlink --canonicalize-existing "$DIR/.."`
+DIR=`run readlink --canonicalize-existing "$DIR/Backups/Volume Headers"`
+FILE=`find_file`
+test -n "$FILE" || die "Could not look up encryption key!"
+FILE=${FILE#$DIR/}
+DIR=`
+	run readlink --canonicalize-existing \
+		"$DIR/../../Key Files"
+`
+FILE=$DIR/${FILE%.hdr}.key
+test -f "$FILE" || die "Cannot locate key file!"
+NUM=`run find_free_tc_slot`
+run truecrypt -N $NUM -k "$FILE" -p '' "$DEV"
+DEV=/dev/mapper/truecrypt$NUM
+test -b "$DEV"
+echo "$DEV"

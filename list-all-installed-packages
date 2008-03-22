@@ -1,0 +1,12 @@
+#! /bin/sh
+# Generates a sorted list of all currently installed packages.
+#
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/list-all-installed-packages $
+# $Author: root(xvaio) $
+# $Date: 2006-10-30T20:03:28.206654Z $
+# $Revision: 371 $
+
+
+(
+	emerge -ep system && emerge -ep world
+) | extract-category-and-package | sort -u

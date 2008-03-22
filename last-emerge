@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/last-emerge $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+
+sub fmt_time($) {
+   my @t= localtime $_[0];
+   return sprintf
+      "%04u-%02u-%02u %02u:%02u:%02u", $t[5] + 1900, $t[4] + 1, @t[3, 2, 1, 0]
+   ;
+}
+
+
+my $logname= '/var/log/emerge.log';
+open IN, '<', $logname or die "Cannot read '$logname': $!";
+my $o;
+while (defined($_= <IN>)) {
+   next unless my($t, $i, $k, $n)
+      = /^(\d+):  >>> emerge \((\d+) of (\d+)\) (.+) to /
+   ;
+   undef $o if $i == 1;
+   $o= '' unless defined $o;
+   $o.= fmt_time($t) . "\t$i\t$n\n";
+}
+close IN or die $!;
+print $o;

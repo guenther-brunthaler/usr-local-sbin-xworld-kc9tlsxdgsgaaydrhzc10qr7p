@@ -1,0 +1,31 @@
+#!/bin/sh
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/add-user-to-groups $
+# $Author: root(xtreme) $
+# $Date: 2006-08-23T03:51:58.733319Z $
+# $Revision: 212 $
+
+
+compose_groups() {
+	local UNAME=$1
+	shift
+	local UGROUP=`id -ng $UNAME`
+	local SEP=
+	for GRP in `groups $UNAME` $*; do
+		if [ "$GRP" != "$UGROUP" ]; then
+			[[ -n "$SEP" ]] && echo -n "," || SEP=1
+			echo -n "$GRP"
+		fi
+	done
+}
+
+
+if [ -z "$1" ]; then
+	echo "$0 adds new existing groups to a user's additional group list"
+	echo "Usage: $0 <username> <group_1> ... "
+	exit 1
+fi
+groups $1 > /dev/null || exit 1
+usermod -G `compose_groups $*` $1 && groups $1 || {
+	echo "Cannot add user '$1' to groups!"
+	exit 1
+}

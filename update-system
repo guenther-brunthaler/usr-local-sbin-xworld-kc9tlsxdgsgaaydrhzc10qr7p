@@ -120,21 +120,26 @@ test $# -ge 1 && { LEVEL="$1"; shift; }
 # End of command line processing.
 CPFX=
 test "$DRY" = 1 && CPFX=echo
+EMERGE_DEFAULT_OPTS=--nospinner
+export EMERGE_DEFAULT_OPTS
 if
 	[ "`printf %s "$LEVEL" | sed -e 's:[^0-9]*::'`" != "$LEVEL" ] \
 	|| [ "$LEVEL" -lt 1 ] || [ "$LEVEL" -gt 5 ]
 then
 	die "Unsupported <level> has been specified!"
 fi
+emerge --sync || die "Could not synchronize Portage tree!"
 if [ -n "$SYNC" ]; then
-	SYNC="emerge --sync"
-	for SY in eix-sync esync; do
-		if which "$SY" > /dev/null 2>& 1; then
-			SYNC=$SY
+	UDB=
+	for UD in update-eix eupdatedb; do
+		if which "$UD" > /dev/null 2>& 1; then
+			UDB=$UD
 			break
 		fi
 	done
-	$CPFX $SYNC || exit
+	if test -n "$UDB"; then
+		$CPFX $UDB || exit
+	fi
 fi
 LEVEL=`expr $LEVEL - 1`; test $LEVEL = 0 && exit
 $CPFX glsa-check --fix affected || exit

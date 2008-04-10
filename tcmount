@@ -1,12 +1,12 @@
 #! /bin/sh
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/tcmount $
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/xworld/tcmount $
 # $Author: root(xvaio) $
 # $Date: 2006-09-03T11:48:00.185929Z $
 # $Revision: 275 $
 
 
-. /usr/local/sbin/functions/tcmount.sh
-. /usr/local/bin/functions/lookup.sh --version 1 LOCAL_TARGETS
+. /usr/local/sbin/xworld/functions/tcmount.sh
+. /usr/local/bin/xworld/functions/lookup.sh --version 1 LOCAL_TARGETS
 
 
 # *** BEGIN OF CONFIGURATION SECTION ***

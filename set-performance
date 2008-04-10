@@ -1,5 +1,5 @@
 #!/bin/sh
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/set-performance $
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/xworld/set-performance $
 # $Author: root(xtreme) $
 # $Date: 2006-08-23T03:51:58.733319Z $
 # $Revision: 212 $
@@ -40,7 +40,7 @@ activate() {
 }
 
 
-source /usr/local/sbin/functions/module_loader.sh || exit 1
+source /usr/local/sbin/xworld/functions/module_loader.sh || exit 1
 while getopts v OPT; do
 	case $OPT in
 		v) OPT_VERBOSE=1;;

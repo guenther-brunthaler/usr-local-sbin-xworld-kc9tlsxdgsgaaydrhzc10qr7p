@@ -1,7 +1,7 @@
 #!/bin/false
 # Helper functions for TrueCrypt mount scripts.
 #
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/functions/tcmount.sh $
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/xworld/functions/tcmount.sh $
 # $Author: root $
 # $Date: 2007-05-30T21:17:40.766801Z $
 # $Revision: 758 $
@@ -81,7 +81,7 @@ chkdir() {
 }
 
 
-. /usr/local/bin/functions/qin.sh
+. /usr/local/bin/xworld/functions/qin.sh
 
 
 # ARG: Call options passed as a single string.
@@ -403,4 +403,4 @@ process() {
 }
 
 
-export PATH="/bin:/usr/bin:/sbin:/usr/local/sbin"
+export PATH="/bin:/usr/bin:/sbin:/usr/local/sbin:/usr/local/sbin/xworld"

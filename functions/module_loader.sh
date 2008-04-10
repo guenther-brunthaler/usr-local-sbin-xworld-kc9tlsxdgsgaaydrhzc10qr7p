@@ -1,7 +1,7 @@
 #!/bin/false
 # Helpers for tracking dynamic module loading and unloading.
 #
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/functions/module_loader.sh $
+# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/xworld/functions/module_loader.sh $
 # $Author: root(xtreme) $
 # $Date: 2006-08-23T03:51:54.910622Z $
 # $Revision: 211 $

@@ -1,0 +1,28 @@
+#! /bin/sh
+# Show a report of the currently active xinetd services.
+# Written in 2008 by Guenther Brunthaler.
+
+
+die() {
+	printf "ERROR: %s\n" "$*" >& 2
+	exit 1
+}
+
+
+run() {
+	"$@" && return
+	die "Could not >>>$*<<<: return code ${?}!"
+}
+
+
+PID=`pidof xinetd`
+DUMPFILE=/var/run/xinetd.dump
+test -n "$PID" || die "xinetd is not currently running!"
+test -e "$DUMPFILE" && run rm "$DUMPFILE"
+kill -USR1 $PID
+TF=`tempfile`
+test $? = 0 || die "Could not create a temporary file!"
+trap "rm \"$TF\"" 0
+run cat "$DUMPFILE" > "$TF"
+run rm "$DUMPFILE"
+less -F "$TF"

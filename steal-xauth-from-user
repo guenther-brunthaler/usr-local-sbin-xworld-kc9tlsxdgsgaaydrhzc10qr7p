@@ -1,0 +1,19 @@
+#! /bin/sh
+# Allows root to steal the X authorization cookie from a specified user.
+# Written in 2007 by Guenther Brunthaler.
+
+
+die() {
+	printf "ERROR: %s\n" "$*" >& 2
+	exit 1
+}
+
+
+USERNAME=${1?Usage $0 <username>}
+USERHOME=`awk -F: '$1 == "'$USERNAME'" {print $6}' < /etc/passwd`
+if test -z "$USERHOME" || test ! -d "$USERHOME"; then
+	die "Invalid user!"
+fi
+xauth add `xauth -f $USERHOME/.Xauthority list \`hostname\`/unix:0` \
+	|| die "Could not import user $USERNAME's xauth cookie!"
+echo "Xauth cookie from user $USERNAME has been imported successfully!"

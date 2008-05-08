@@ -6,7 +6,8 @@
 
 
 . /usr/local/sbin/xworld/functions/tcmount.sh
-. /usr/local/bin/xworld/functions/lookup.sh --version 1 LOCAL_TARGETS
+. /usr/local/bin/xworld/functions/lookup.sh --version 1 \
+	--namespace tcmount_a2grm2aa4hu0gfb6rucv0gayl LOCAL_TARGETS
 
 
 # *** BEGIN OF CONFIGURATION SECTION ***

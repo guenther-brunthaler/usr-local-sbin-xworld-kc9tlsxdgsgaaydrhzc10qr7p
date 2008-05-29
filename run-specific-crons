@@ -9,7 +9,7 @@
 # $Revision: 219 $
 
 
-for CRONDIR in /etc/cron.$1 /usr/local/etc/cron.d/$1; do
+for CRONDIR in /etc/cron.$1 /usr/local/etc/cron.$1; do
 	test -d $CRONDIR || exit
 	set +e
 	for SCRIPT in $CRONDIR/*; do

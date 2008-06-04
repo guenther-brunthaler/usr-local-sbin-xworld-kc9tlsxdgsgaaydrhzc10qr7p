@@ -1,0 +1,53 @@
+#! /usr/bin/perl -w
+# Displays ppp modem connect times and disconnect reason.
+
+
+use strict;
+use Time::Local;
+
+
+my($start, $end, @t, $duration, $is_disconnect);
+open IN, '<', "/var/log/daemon" or die $!;
+while (defined($_= <IN>)) {
+   if (
+      (@t[reverse 0 .. 5], $duration)= /
+         ^
+         # Date and time.
+         (\d\d\d\d) - (\d\d) - (\d\d) [ ]
+         (\d\d) : (\d\d) : (\d\d) [ ]
+         # PID.
+         info[ ]pppd\[\d+]:[ ]
+         (?:
+            # Time indicates when session has been terminated.
+            LCP[ ]terminated[ ]by[ ]peer
+         |
+            # How long the session has been.
+            Connect[ ]time[ ] (\d+(?:\.\d+)?) [ ]minutes.
+         )
+         $
+      /x
+   ) {
+      if (defined $duration) {
+         $start= (
+            $end= timelocal do {--$t[4]; $t[5]-= 1900; @t}
+         ) - $duration * 60;
+         sub tfmt($) {
+            my @t= localtime shift;
+            return sprintf
+               '%04u-%02u-%02u %02u:%02u:%02u'
+               , $t[5] + 1900, $t[4] + 1, @t[reverse 0 .. 3]
+            ;
+         }
+         print
+            tfmt $start, " to ", tfmt $end, ": "
+            , sprintf('%5.2f', $duration / 60), " hours, "
+            , ($is_disconnect ? "kicked" : "normal/unknown"), "\n"
+         ;
+      } else {
+         $is_disconnect= 1;
+         next;
+      }
+   }
+   undef $is_disconnect;
+}
+close IN or die;

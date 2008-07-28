@@ -1,0 +1,22 @@
+#! /bin/sh
+# Compiles the current kernel with configuration found at at
+# /usr/src/kbuild/target
+# and installs it to
+# /boot/image/target
+# and also the kernel modules to their correct location.
+# After that, all kernel-dependent packages will be re-emerged.
+# The script assumes to be run from within the kernel build directory.
+
+
+set -x
+set -e
+THERE=`readlink --canonicalize \`pwd -P\``
+cd /usr/src/kbuild/target
+HERE=`readlink --canonicalize \`pwd -P\``
+test x"$HERE" = x"$THERE"
+unset HERE THERE
+make -j5 2>& 1 > msgs | tee failures 
+make INSTALL_MOD_STRIP=1 modules_install
+make V=1 INSTALL_PATH=/boot/image/target install
+module-rebuild rebuild
+make -s kernelrelease

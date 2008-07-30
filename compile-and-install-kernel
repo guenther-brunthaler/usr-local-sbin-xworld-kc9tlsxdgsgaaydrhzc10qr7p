@@ -8,8 +8,7 @@
 # The script assumes to be run from within the kernel build directory.
 
 
-set -x
-set -e
+set -xe
 THERE=`readlink --canonicalize \`pwd -P\``
 cd /usr/src/kbuild/target
 HERE=`readlink --canonicalize \`pwd -P\``

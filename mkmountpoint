@@ -10,15 +10,20 @@
 
 die() {
 	echo "ERROR: $*" >& 2
-	exit 1
+	false; exit
 }
 
 
-if [ ! -e "$1" ]; then
-	mkdir -p "$1" || die "Could not create mount point directory '$1'!"
-elif [ ! -d "$1" ]; then
-	die "Mount point '$1' already exists and is not a directory!"
-fi
-chown nobody:nogroup "$1" || die "Could not set owner for '$1'!"
-chmod ugo=,-st "$1" || die "Could not set permissions for '$1'!"
-echo "Mount point directory '$1' has successfully been set up!"
+while true; do
+	if test ! -e "$1"; then
+		mkdir -p "$1" \
+			|| die "Could not create mount point directory '$1'!"
+	elif test ! -d "$1"; then
+		die "Mount point '$1' already exists and is not a directory!"
+	fi
+	chown nobody:nogroup "$1" || die "Could not set owner for '$1'!"
+	chmod ugo=,-st "$1" || die "Could not set permissions for '$1'!"
+	echo "Mount point directory '$1' has successfully been set up!"
+	shift
+	test $# = 0 && break
+done

@@ -1,0 +1,81 @@
+#! /bin/sh
+
+
+die() {
+	echo "ERROR: $*" >& 2
+	false; exit
+}
+
+
+run() {
+	"$@" && return
+	die "Command >>>$*<<< failed with return code ${?}!"
+}
+
+
+system() {
+	REPLY=`run "$@"` || exit
+}
+
+
+inform() {
+	run printf '%s\n' "$*"
+}
+
+
+getstat() {
+	system stat -c "$1" "$2"
+}
+
+
+setmod() {
+	local REPLY
+	getstat %a "$2"
+	test x"$REPLY" = x"$1" || {
+		inform "Setting mode for '$2' to $1."
+		run chmod "$1" "$2"
+	}
+}
+
+
+setfmod() {
+	local MOD FILE GROUP
+	MOD=$1; FILE=$2; GROUP=${3:-root}
+	local REPLY
+	if test ! -e "$FILE"; then
+		inform "Creating '$FILE'."
+		run true > "$FILE"
+	else
+		run test -f "$FILE"
+	fi
+	setmod "$MOD" "$FILE"
+	getstat %G "$FILE"
+	if test x"$REPLY" != x"$GROUP"; then
+		inform "Changing group for '$FILE' to '$GROUP'."
+		run chgrp "$GROUP" "$FILE"
+	fi
+}
+
+
+run cd /var/log
+umask 077
+for N in \
+	kernel logger cron daemon auth critical master local0admin \
+	local2sulog local3audit local4exposure local6ids trafficvol \
+	faillog
+do
+	setfmod 600 "$N"
+done
+for N in archive; do
+	if test ! -e "$N"; then
+		inform "Creating directory '$N'."
+		run mkdir "$N"
+	else
+		run test -d "$N"
+	fi
+	setmod 700 "$N"
+done
+for N in btmp wtmp; do
+	setfmod 664 "$N" utmp
+done
+setfmod 644 lastlog

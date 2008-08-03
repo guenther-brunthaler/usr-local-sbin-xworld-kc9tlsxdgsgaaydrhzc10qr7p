@@ -1,2 +1,0 @@
-#! /bin/sh
-exec delayed-shutdown 1

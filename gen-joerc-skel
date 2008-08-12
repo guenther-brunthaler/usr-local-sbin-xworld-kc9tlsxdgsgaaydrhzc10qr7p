@@ -142,7 +142,6 @@ my @changes= (
    , {trigger => [qw/*.y/], add => $USER_prog}
    , {trigger => [qw/*.l/], add => $USER_prog}
    , {trigger => [qw/*.tcl/], add => $USER_prog_x}
-   , {trigger => [qw/*.ac/], add => $USER_prog}
    , {trigger => [qw/*.m4/], add => $USER_prog}
    , {trigger => [qw/*.sql/], add => $USER_prog}
    , {trigger => [qw/*.xml/], add => $USER_pnowrap}

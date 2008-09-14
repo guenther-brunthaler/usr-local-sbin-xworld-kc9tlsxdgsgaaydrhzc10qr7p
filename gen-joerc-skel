@@ -48,9 +48,12 @@ my $USER_NEWSTUFF= << "." . $USER_prog_x;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
 .
-my $USER_JavaScript= << ".";
+my $USER_JavaScript= [map << "=" . $_, << "+", << "."];
    \40JavaScript / ECMAScript
+=
    *.js
++
+   *
    +#!\\+\\[ \t]\\+\\[a-z/]/env kjscmd\\>
 .
 # What to change.

@@ -48,6 +48,11 @@ my $USER_NEWSTUFF= << "." . $USER_prog_x;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
 .
+my $USER_JavaScript= << ".";
+   \40JavaScript / ECMAScript
+   *.js
+   +#!\\+\\[ \t]\\+\\[a-z/]/env kjscmd\\>
+.
 # What to change.
 my @changes= (
    # Format: An anonymous hash for each change.
@@ -80,11 +85,12 @@ my @changes= (
    #  trigger. Same format as for "add".
    #  This text will, however, not become part of the
    #  buffer to be used for "duplicate".
-   # duplicate => $SINGLE_STRING
-   # duplicate => $STRING_ARRAY
-   #  A string or anonymous array of strings.
+   # duplicate => $SINGLE_MULTILINE_STRING
+   # duplicate => $MULTIILINE_STRING_ARRAY
+   #  A string or anonymous array of multiline strings,
+   #  like the value for the "add"-key.
    #  When the first trigger for a hash matches,
-   #  and the text has been added, the whole section
+   #  and the "add"-text has been added, the whole section
    #  following the trigger line until the first empty line
    #  (after the added text) will be copied to a buffer.
    #  Then, for each string in the duplicates,
@@ -127,7 +133,10 @@ my @changes= (
    }
    , {trigger => [qw/*.v *.vh/], add => $USER_prog}
    , {trigger => [qw/*.vhd/], add => $USER_prog}
-   , {trigger => [qw/*.java/], add => $USER_prog}
+   , {
+      trigger => [qw/*.java/], add => $USER_prog
+      , duplicate => $USER_JavaScript
+   }
    , {trigger => [qw/*.php/], add => $USER_prog}
    , {
       trigger => "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"
@@ -168,7 +177,6 @@ foreach ($begin_modification_tag, $end_modification_tag) {
 }
 # Preprocess @changes.
 foreach $c (@changes) {
-   my(@lines, $j);
    # Keys which must exist.
    foreach $k (qw/trigger add/) {
       unless (exists $c->{$k}) {
@@ -184,14 +192,13 @@ foreach $c (@changes) {
       $t= quotemeta $k;
       $k= qr/ ^ $t (?: \s | $ ) /x;
    }
-   if (@{$c->{duplicate}}) {
-      $c->{buffer}= '';
-      $c->{collecting}= 1;
-   }
-   foreach $j (qw/add insert/) {
-      $t= $c->{$j} or next;
+   sub rlcip(\$) {
+      # Remove longest common indentation prefix from lines.
+      my $ref= shift;
+      my $t= $$ref;
       chomp $t;
-      @lines= split '\n', $t, -1;
+      my @lines= split '\n', $t, -1;
+      my $i;
       OUTER: for ($i= 1;; ++$i) {
          undef $t;
          foreach $k (@lines) {
@@ -205,8 +212,8 @@ foreach $c (@changes) {
          }
       }
       --$i;
-      $c->{$j}= join "\n", map(substr($_, $i), @lines), '';
-      $c->{$j} =~ s<
+      $$ref= join "\n", (map {s/\s*$//; $_} map substr($_, $i), @lines), '';
+      $$ref =~ s<
          \$
          (?:
             \{ (\w+) \}
@@ -217,6 +224,15 @@ foreach $c (@changes) {
          $1 || $2 ? $ENV{$1 || $2} : '$'
          or die "Undefined \$ENV{" . ($1 || $2) . "}"
       >gex;
+   }
+   if (@{$c->{duplicate}}) {
+      $c->{buffer}= '';
+      $c->{collecting}= 1;
+      rlcip $_ foreach @{$c->{duplicate}};
+   }
+   foreach $k (qw/add insert/) {
+      $c->{$k} || next;
+      rlcip $c->{$k};
    }
 }
 $any= globrx @changes;
@@ -263,7 +279,7 @@ foreach my $joerc (@joerc_files) {
                die unless defined $c->{buffer};
                foreach $k (@{$c->{duplicate}}) {
                   print OUT
-                     "$begin_modification_tag\n$k\n"
+                     $begin_modification_tag . "\n" . $k
                      . $c->{buffer} . $end_modification_tag
                   ;
                }

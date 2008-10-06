@@ -150,9 +150,9 @@ my @changes= (
    , {
       trigger => [qw/*.lisp *.lsp/]
       , duplicate => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]tinyscheme\\>"
-      , add => $USER_prog
+      , add => $USER_prog_x
    }
-   , {trigger => [qw/*.el/], add => $USER_prog}
+   , {trigger => [qw/*.el/], add => $USER_prog_x}
    , {trigger => [qw/*.p *.pas/], add => $USER_prog}
    , {trigger => [qw/*.f *.for *.FOR/], add => $USER_prog}
    , {trigger => [qw/*.y/], add => $USER_prog}

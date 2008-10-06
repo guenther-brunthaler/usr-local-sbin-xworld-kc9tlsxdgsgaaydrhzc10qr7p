@@ -149,7 +149,7 @@ my @changes= (
    , {trigger => "*.py", add => $USER_prog}
    , {
       trigger => [qw/*.lisp *.lsp/]
-      , duplicate => ["*\n+#!\\+\\[ \t]\\+\\[a-z/]/tinyscheme\\>"]
+      , duplicate => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]tinyscheme\\>"
       , add => $USER_prog
    }
    , {trigger => [qw/*.el/], add => $USER_prog}

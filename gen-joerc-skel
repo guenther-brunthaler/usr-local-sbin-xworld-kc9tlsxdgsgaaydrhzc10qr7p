@@ -1,8 +1,38 @@
-#!/usr/bin/perl -w
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/gen-joerc-skel $
-# $Author: root $
-# $Date: 2007-08-21T19:55:18.464591Z $
-# $Revision: 907 $
+#! /usr/bin/perl -w
+# A synthesizer for customized $HOME/.joe files.
+#
+# Written by Guenther Brunthaler.
+
+
+# First, some general comments on the "joe" syntax detection feature.
+#
+# In order to make block of settings depending on a file type, two
+# sorts of conditions are supported.
+#
+# The first one is to check for a file extension such as "*" (matches all
+# extensions) or "*.txt" (matches only files ending in ".txt").
+#
+# The second sort is a "joe"-style regular expression which has to match
+# the first line of the file's contents. These are the same expressions
+# as used in joe's built-in search command.
+#
+# Of those types of conditions, the first type is mandatory for a new
+# block of statements - even if it is just "*".
+#
+# More conditions can follow the first condition of a new block of statements.
+#
+# But those conditions will always be logical AND-combined with the
+# other conditions.
+#
+# This means that
+#
+# *.c
+# *.h
+#
+# will never match anything. Instead, two separate blocks should be created,
+# using a single wildcard expression only.
+#
+# This is what the "duplicate"-feature of this tool has been made for.
 
 
 my @joerc_files= (
@@ -25,6 +55,14 @@ my $USER_prog= << '.';
 .
 my $USER_prog_x= << '.' . $USER_prog;
    -tab 3
+.
+my $USER_LISP_prog= << '.';
+   -indentc 32
+   -istep 2
+   -spaces
+.
+my $USER_LISP_prog_x= << '.' . $USER_LISP_prog;
+   -tab 2
 .
 my $USER_nowrap= '--wordwrap';
 my $USER_pnowrap= << "." . $USER_prog;
@@ -143,16 +181,20 @@ my @changes= (
    , {trigger => [qw/*.php/], add => $USER_prog}
    , {
       trigger => "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"
-      , insert  => "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
+      , duplicate  => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
       , add  => $USER_prog
    }
    , {trigger => "*.py", add => $USER_prog}
    , {
-      trigger => [qw/*.lisp *.lsp/]
-      , duplicate => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]tinyscheme\\>"
-      , add => $USER_prog_x
+      trigger => [qw/*.lisp *.lsp *.sch *.scm *.ss/]
+      , duplicate => [
+           "*\n"
+         . "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>\n"
+         , "*\n+#!\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>"
+      ]
+      , add => $USER_LISP_prog_x
    }
-   , {trigger => [qw/*.el/], add => $USER_prog_x}
+   , {trigger => [qw/*.el/], add => $USER_LISP_prog_x}
    , {trigger => [qw/*.p *.pas/], add => $USER_prog}
    , {trigger => [qw/*.f *.for *.FOR/], add => $USER_prog}
    , {trigger => [qw/*.y/], add => $USER_prog}

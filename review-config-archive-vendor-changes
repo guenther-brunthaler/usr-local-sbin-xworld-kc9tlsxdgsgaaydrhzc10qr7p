@@ -1,0 +1,32 @@
+#! /bin/sh
+
+
+die() {
+	echo "ERROR: $*" >& 2
+	false; exit
+}
+
+
+run() {
+	"$@" && return
+	die "Could not execute >>>$*<<<, return code = ${?}!"
+}
+
+
+run test -f "$1"
+V=$1
+F=${V%,v}
+F=${F##*/}
+TD="${0##*/}_$$~.tmp"
+run test ! -e "$TD"
+run mkdir -m 700 -- "$TD"
+run trap 'rm -rf "$TD"' 0
+(
+	run cd "$TD"
+	rlog "$V" | grep "^revision 1\.1\." | sort -g | cut -d" " -f2 \
+		| while IFS= read R; do
+			run co -r"$R" -p "$V" > "$F-$R"
+		done || exit
+	run ls -d "$F"-1.1.*.* | run mkpairs \
+		| run xargs -n2 --interactive kompare > /dev/null
+)

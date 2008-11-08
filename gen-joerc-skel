@@ -1,4 +1,5 @@
 #! /usr/bin/perl -w
+#
 # A synthesizer for customized $HOME/.joe files.
 #
 # Written by Guenther Brunthaler.
@@ -68,7 +69,13 @@ my $USER_nowrap= '--wordwrap';
 my $USER_pnowrap= << "." . $USER_prog;
    $USER_nowrap
 .
-my $USER_NEWSTUFF= << "." . $USER_prog_x;
+my $USER_SIMPLICITY= << "." . $USER_prog_x;
+   \40
+    Simplicity source file
+   *
+   +#!\\+\\[ \t]\\+\\[a-z/]/env simple\\>
+.
+my $USER_NEWSTUFF= << "." . $USER_prog_x . $USER_SIMPLICITY;
    \40
     Completely new entries.
    \40

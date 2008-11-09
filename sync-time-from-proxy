@@ -8,4 +8,8 @@ case $1 in
 		echo "Usage: $0 [ <ntp_server> ]"
 		exit
 esac
+# Checking for errors is not a good idea, as ntpdate returns 1
+# if the stratum level is not low enough, which might always
+# be the case for "proxy".
 ntpdate -s -b -u "${1:-proxy}"
+date

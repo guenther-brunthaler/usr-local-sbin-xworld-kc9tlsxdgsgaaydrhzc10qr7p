@@ -1,0 +1,11 @@
+#! /bin/sh
+# Use ntpdate to synchronize the current system time
+# with the machine "proxy" (typically defined in /etc/host).
+
+
+case $1 in
+	-*)
+		echo "Usage: $0 [ <ntp_server> ]"
+		exit
+esac
+ntpdate -s -b -u "${1:-proxy}"

@@ -76,6 +76,11 @@ find_free_tc_slot() {
 
 
 DEV=${1?Usage: /dev/<tc_container_device>}
+MP=$2
+if test -n "$MP"; then
+	run test -d "$MP"
+	MP=`run readlink -f "$MP"`
+fi
 run test -b "$DEV"
 MD5SUM=`
 	truecrypt --backup-headers /dev/stderr "$DEV" 2>& 1 > /dev/null \
@@ -83,21 +88,23 @@ MD5SUM=`
 `
 PWLIST="$HOME/.pwlist"
 run test -f "$PWLIST"
-PWLIST=`run readlink --canonicalize-existing "$PWLIST"`
+PWLIST=`run readlink -f "$PWLIST"`
 DIR=`run dirname "$PWLIST"`
-DIR=`run readlink --canonicalize-existing "$DIR/.."`
-DIR=`run readlink --canonicalize-existing "$DIR/Backups/Volume Headers"`
+DIR=`run readlink -f "$DIR/.."`
+DIR=`run readlink -f "$DIR/Backups/Volume Headers"`
 FILE=`find_file`
 test -n "$FILE" || die "Could not look up encryption key!"
 FILE=${FILE#$DIR/}
 DIR=`
-	run readlink --canonicalize-existing \
+	run readlink -f \
 		"$DIR/../../Key Files"
 `
 FILE=$DIR/${FILE%.hdr}.key
 test -f "$FILE" || die "Cannot locate key file!"
 NUM=`run find_free_tc_slot`
-run truecrypt -N $NUM -k "$FILE" -p '' "$DEV"
+run truecrypt -N $NUM -k "$FILE" -p '' "$DEV" $MP
 DEV=/dev/mapper/truecrypt$NUM
 test -b "$DEV"
-echo "$DEV"
+set -- "$DEV"
+test -n "$MP" && set -- "$@" "@ '$MP'"
+echo "$*"

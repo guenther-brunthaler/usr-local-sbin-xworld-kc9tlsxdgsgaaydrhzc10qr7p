@@ -20,3 +20,6 @@ make INSTALL_MOD_STRIP=1 modules_install
 make V=1 INSTALL_PATH=/boot/image/target install
 module-rebuild rebuild
 make -s kernelrelease
+tar -cf survive.tar modules.order Module.symvers System.map
+make clean
+tar -xf survive.tar && rm survive.tar

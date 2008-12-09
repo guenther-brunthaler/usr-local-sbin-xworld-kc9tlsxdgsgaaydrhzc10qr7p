@@ -14,12 +14,31 @@ cd /usr/src/kbuild/target
 HERE=`readlink --canonicalize \`pwd -P\``
 test x"$HERE" = x"$THERE"
 unset HERE THERE
-make `. /etc/make.conf && printf '%s\n' "$MAKEOPTS"` 2>& 1 > msgs \
-	| tee failures
-make INSTALL_MOD_STRIP=1 modules_install
-make V=1 INSTALL_PATH=/boot/image/target install
-module-rebuild rebuild
+SKIPTO=`printf '%s' "$1" | tr -dc '[:digit:]'`
+SKIPTO=${SKIPTO:-1}
+if test $SKIPTO = 1; then
+	echo "*** PHASE 1 ***"
+	make `. /etc/make.conf && printf '%s\n' "$MAKEOPTS"` 2>& 1 > msgs \
+		| tee failures
+else
+	echo "Skipping to PHASE $SKIPTO..."
+fi
+if test $SKIPTO -le 2; then
+	echo "*** PHASE 2 ***"
+	make INSTALL_MOD_STRIP=1 modules_install
+fi
+if test $SKIPTO -le 3; then
+	echo "*** PHASE 3 ***"
+	make V=1 INSTALL_PATH=/boot/image/target install
+fi
+if test $SKIPTO -le 4; then
+	echo "*** PHASE 4 ***"
+	module-rebuild rebuild
+fi
+if test $SKIPTO -le 5; then
+	echo "*** PHASE 5 ***"
+	tar -cf survive.tar modules.order Module.symvers System.map
+	make clean
+	tar -xf survive.tar && rm survive.tar
+fi
 make -s kernelrelease
-tar -cf survive.tar modules.order Module.symvers System.map
-make clean
-tar -xf survive.tar && rm survive.tar

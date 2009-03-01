@@ -65,7 +65,7 @@ my $USER_prog_x= << '.' . $USER_prog;
 my $USER_prog2_x= << '.' . $USER_prog2;
    -tab 2
 .
-my $USER_OCAML_prog= << '.' . $USER_prog2;
+my $USER_OCAML_prog= << '.' . $USER_prog2_x;
    -syntax ocaml
 .
 my $USER_nowrap= '--wordwrap';

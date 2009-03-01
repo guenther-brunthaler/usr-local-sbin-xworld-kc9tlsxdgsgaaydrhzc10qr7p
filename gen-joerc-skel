@@ -54,16 +54,19 @@ my $USER_prog= << '.';
    -istep 3
    -spaces
 .
-my $USER_prog_x= << '.' . $USER_prog;
-   -tab 3
-.
-my $USER_LISP_prog= << '.';
+my $USER_prog2= << '.';
    -indentc 32
    -istep 2
    -spaces
 .
-my $USER_LISP_prog_x= << '.' . $USER_LISP_prog;
+my $USER_prog_x= << '.' . $USER_prog;
+   -tab 3
+.
+my $USER_prog2_x= << '.' . $USER_prog2;
    -tab 2
+.
+my $USER_OCAML_prog= << '.' . $USER_prog2;
+   -syntax ocaml
 .
 my $USER_nowrap= '--wordwrap';
 my $USER_pnowrap= << "." . $USER_prog;
@@ -172,7 +175,15 @@ my @changes= (
    }
    , {trigger => [qw/*.tex *.sty/], add => $USER_pnowrap}
    , {trigger => [qw/*.asm *.s *.S/], add => $USER_nowrap}
-   , {trigger => [qw/*.sml *.ml *.mli/], add => $USER_prog}
+   , {
+      trigger => [qw/*.sml *.ml *.mli/]
+      , duplicate => [
+           "*\n"
+         . "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]\\+\\[a-z0-9/]ocaml\\>\n"
+         , "*\n+#!\\+\\[ \t]\\+\\[a-z0-9/]ocaml\\>"
+      ]
+      , add => $USER_OCAML_prog
+   }
    , {trigger => [qw/*.c *.h/], add => $USER_prog}
    , {
       trigger => [qw/*.cpp *.c++ *.hpp *.h++/]
@@ -199,9 +210,9 @@ my @changes= (
          . "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>\n"
          , "*\n+#!\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>"
       ]
-      , add => $USER_LISP_prog_x
+      , add => $USER_prog2_x
    }
-   , {trigger => [qw/*.el/], add => $USER_LISP_prog_x}
+   , {trigger => [qw/*.el/], add => $USER_prog2_x}
    , {trigger => [qw/*.p *.pas/], add => $USER_prog}
    , {trigger => [qw/*.f *.for *.FOR/], add => $USER_prog}
    , {trigger => [qw/*.y/], add => $USER_prog}

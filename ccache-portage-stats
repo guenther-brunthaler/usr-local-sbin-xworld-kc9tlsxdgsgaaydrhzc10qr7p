@@ -1,0 +1,5 @@
+#! /bin/sh
+echo "ccache statistics for user 'portage':"
+echo
+exec su -s /bin/sh - portage \
+	sh -c "CCACHE_DIR=/var/tmp/ccache ccache -s" 2> /dev/null

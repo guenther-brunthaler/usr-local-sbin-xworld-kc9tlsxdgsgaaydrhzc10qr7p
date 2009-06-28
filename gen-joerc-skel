@@ -204,6 +204,14 @@ my @changes= (
    }
    , {trigger => "*.py", add => $USER_prog}
    , {
+      trigger => "*.lua", add => $USER_prog
+      , add  => $USER_prog_x . "   -syntax none"
+      , duplicate => [
+         "+#!\\+\\[ \t]\\+\\[a-z/]/lua\\>"
+         , "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]lua\\>"
+      ]
+   }
+   , {
       trigger => [qw/*.lisp *.lsp *.sch *.scm *.ss/]
       , duplicate => [
            "*\n"

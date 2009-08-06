@@ -59,6 +59,11 @@ show_help() {
 	file. If omitted, an unassigned number is picked at random from the
 	numerical range 1 to 9999 with preference of the range 1 to 99.
 
+	-M <string>, --mount-options <string>: Allows additional mount options
+	to be passed through to 'mount' when mounting the virtual decrypted
+	filesystem. Useful for specifying a fixed user and group ownership for
+	filesystems which do not store such information, such as FAT.
+
 	--volume-headers-relative-path <reldirpath>: This is a relative
 	directory path to the TrueCrypt volume header backup files for the
 	volumes which can be handled by $APP. <reldirpath> must be a path
@@ -219,6 +224,7 @@ PWLIST="$HOME/.pwlist"
 VOLHEADERS_RELPATH="Backups/Volume Headers"
 KEYFILES_RELPATH="../../Key Files"
 MAPPER_PREFIX=/dev/mapper/truecrypt
+MOUNT_OPTIONS=
 CONTAINER_IS_FILE=
 RO_MODE=
 NUM=
@@ -249,6 +255,7 @@ do
 		--pwlist | --password-list) PWLIST=$1; shift;;
 		-r | --read-only | --readonly) RO_MODE=Y;;
 		-N | --device-number | --mapping-number) NUM=$1; shift;;
+		-M | --mount-options) MOUNT_OPTIONS=$1; shift;;
 		--volume-headers-relative-path) VOLHEADERS_RELPATH=$1; shift;;
 		--key-files-relative-path) KEYFILES_RELPATH=$1; shift;;
 		--device-mapper-prefix) MAPPER_PREFIX=$1; shift;;
@@ -297,6 +304,7 @@ then
 fi
 set -- truecrypt -N "$NUM"
 test -n "$RO_MODE" && set -- "$@" --read-only
+test -n "$MOUNT_OPTIONS" && set -- "$@" --mount-options "$MOUNT_OPTIONS"
 set -- "$@" -k "$FILE" -p '' "$DEV"
 test -n "$MP" && set -- "$@" "$MP"
 run "$@"

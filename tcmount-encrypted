@@ -102,6 +102,9 @@ show_help() {
 	supported. For instance, when specifying two separate options "-x" and
 	"-y", the combined option argument "-xy" means exactly the same thing.
 
+
+	Details on operation of $APP
+
 	
 	In order to find the required decryption key, two directories are
 	required which should be located in secure locations (i. e.
@@ -118,7 +121,13 @@ show_help() {
 	volume. The .key file will be searched in the second of the required
 	directories, which must contain all the key files for the TrueCrypt
 	containers supported by $APP.
-
+	
+	In addition to binary key files, files containing text passwords can
+	only be used. Any such files must also be present in the key files
+	directory, but have a file extension ".psw" instead of ".key".
+	
+	Either a password file, a key file, or both must be present.
+	
 	
 .
 	show_version
@@ -212,6 +221,18 @@ find_free_tc_slot() {
 }
 
 
+# Just calls TrueCrypt with all the arguments, except for the first argument
+# which must be the filename of a password file.
+#
+# The contents of that password file will be piped to TrueCrypt as standard
+# input.
+tc_psw_wrapper() {
+	local PSW_FILE
+	PSW_FILE=$1; shift
+	cat "$PSW_FILE" | truecrypt "$@"
+}
+
+
 APP=${0##*/}
 # Determine output line width.
 LINEWIDTH=
@@ -297,15 +318,26 @@ test -n "$FILE" || die "Could not look up encryption key!"
 FILE=${FILE#$DIR/}
 system readlink -f "$DIR/$KEYFILES_RELPATH"; DIR=$REPLY
 FILE=$DIR/${FILE%.hdr}.key
-test -f "$FILE" || die "Cannot locate key file!"
+PSW=$DIR/${FILE%.hdr}.psw
+test -f "$FILE" || FILE=
+test -f "$PSW" || PSW=
+test -n "$FILE$PSW" || die "Cannot locate key/password file!"
 if test -z "$NUM"
 then
 	system find_free_tc_slot; NUM=$REPLY
 fi
-set -- truecrypt -N "$NUM"
+if test -n "$PSW"
+then
+	set -- tc_psw_wrapper "$PSW"
+else
+	set -- truecrypt
+fi
+set -- "$@" -N "$NUM"
 test -n "$RO_MODE" && set -- "$@" --read-only
 test -n "$MOUNT_OPTIONS" && set -- "$@" --mount-options "$MOUNT_OPTIONS"
-set -- "$@" -k "$FILE" -p '' "$DEV"
+test -n "$FILE" && set -- "$@" -k "$FILE"
+test -z "$PSW" && set -- "$@" -p ''
+set -- "$@" "$DEV"
 test -n "$MP" && set -- "$@" "$MP"
 run "$@"
 DEV=$MAPPER_PREFIX$NUM

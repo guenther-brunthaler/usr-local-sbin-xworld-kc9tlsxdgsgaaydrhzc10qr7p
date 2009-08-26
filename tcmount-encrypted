@@ -328,11 +328,14 @@ test -n "$FILE" || die "Could not look up encryption key!"
 inform "Matching header \"$FILE\" found in store."
 FILE=${FILE#$DIR/}
 system readlink -f "$DIR/$KEYFILES_RELPATH"; DIR=$REPLY
-FILE=$DIR/${FILE%.hdr}.key
-PSW=$DIR/${FILE%.hdr}.psw
+FILE=$DIR/${FILE%.hdr}
+QFILE=$FILE.key; QPSW=$FILE.psw
+FILE=$QFILE; PSW=$QPSW
 test -f "$FILE" || FILE=
 test -f "$PSW" || PSW=
-test -n "$FILE$PSW" || die "Cannot locate key/password file!"
+test -n "$FILE$PSW" \
+	|| die "Cannot locate key file \"$QFILE\" " \
+		"and/or password file \"$QPSW\"!"
 if test -z "$NUM"
 then
 	system find_free_tc_slot; NUM=$REPLY

@@ -93,9 +93,11 @@ show_help() {
 	this option will be interpreted as normal arguments, even if they
 	start with "-" or "--".
 
-	--help, -h, --usage: Display this help.
+	-h, --help, --usage: Display this help.
+	
+	-v, --verbose: Be more verbose.
 
-	--version, -V: Show version information.
+	-V, --version: Show version information.
 
 	
 	"Switch clustering" for short-options (single-dash options) is
@@ -165,6 +167,11 @@ wr() {
 	else
 		run fmt $S -w $LINEWIDTH
 	fi
+}
+
+
+inform() {
+	test -z "$VERBOSE" || echo "INFO: $*" >& 2
 }
 
 
@@ -251,6 +258,7 @@ RO_MODE=
 NUM=
 DEV=
 MP=
+VERBOSE=
 #
 COPTS=
 while :
@@ -281,6 +289,7 @@ do
 		--key-files-relative-path) KEYFILES_RELPATH=$1; shift;;
 		--device-mapper-prefix) MAPPER_PREFIX=$1; shift;;
                 -h | --help) show_help | less --quit-if-one-screen; exit;;
+		-v | --verbose) VERBOSE=Y;;
 		-V | --version) show_version; exit;;
 		*) die "Unknown option '$COPT'!";; # Must be last!
 	esac
@@ -308,6 +317,7 @@ MD5SUM=`
 	truecrypt --backup-headers /dev/stderr "$DEV" 2>& 1 > /dev/null \
 		| chksum
 `
+inform "TrueCrypt header checksum of \"$DEV\" is $MD5SUM!"
 run test -f "$PWLIST"
 system readlink -f "$PWLIST"; PWLIST=$REPLY
 system dirname "$PWLIST"; DIR=$REPLY
@@ -315,6 +325,7 @@ system readlink -f "$DIR/.."; DIR=$REPLY
 system readlink -f "$DIR/$VOLHEADERS_RELPATH"; DIR=$REPLY
 FILE=`find_file`
 test -n "$FILE" || die "Could not look up encryption key!"
+inform "Matching header \"$FILE\" found in store."
 FILE=${FILE#$DIR/}
 system readlink -f "$DIR/$KEYFILES_RELPATH"; DIR=$REPLY
 FILE=$DIR/${FILE%.hdr}.key

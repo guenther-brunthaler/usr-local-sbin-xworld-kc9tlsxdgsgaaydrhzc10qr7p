@@ -17,17 +17,19 @@ run() {
 
 process() {
 	echo "Backing up and uninstalling \"$1\"..."
-	run quickpkg --ignore-default-opts --include-config=y --include-unmodified-config=y "$1"
+	run quickpkg --ignore-default-opts --include-config=y \
+		--include-unmodified-config=y "$1"
 	CLEAN_DELAY=0 run emerge -C "$1"
 	echo
 }
 
 
 usage() {
-	die "Usage: ${0##*/} <package> ... | --list <package-list> ..."
+	die "Usage: ${0##*/} <package> ... | --list [ - | <package-list> ] ..."
 }
 
 
+test $# = 0 && usage
 if test x"$1" != x"--list"
 then
 	for PACKAGE
@@ -38,7 +40,9 @@ else
 	shift
 	for PACKAGELIST
 	do
-		run test -f "$PACKAGELIST" || usage
+		test x"$PACKAGELIST" = x- && PACKAGELIST=/dev/stdin
+		test -f "$PACKAGELIST" \
+			|| test -p "$PACKAGELIST" || usage
 		for PACKAGE in `IFS= cat "$PACKAGELIST"`
 		do
 			process "$PACKAGE"

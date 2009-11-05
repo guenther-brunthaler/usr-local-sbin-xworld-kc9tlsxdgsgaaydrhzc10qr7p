@@ -347,7 +347,11 @@ else
 	set -- truecrypt
 fi
 set -- "$@" -N "$NUM"
-test -n "$RO_MODE" && set -- "$@" --read-only
+if test -n "$RO_MODE"
+then
+	set -- "$@" --read-only
+	MOUNT_OPTIONS="$MOUNT_OPTIONS${MOUNT_OPTIONS:+,}ro"
+fi
 test -n "$MOUNT_OPTIONS" && set -- "$@" --mount-options "$MOUNT_OPTIONS"
 test -n "$FILE" && set -- "$@" -k "$FILE"
 test -z "$PSW" && set -- "$@" -p ''

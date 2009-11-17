@@ -1,0 +1,41 @@
+#! /usr/bin/perl -n
+# Expects the contents of /etc/portage/package.use at stdin
+# and expands single lines with multiple USE flags to
+# multiple lines with single USE flags. Line comments are replicated.
+# The result is written to standard output.
+#
+# Written in 2009 by Guenther Brunthaler.
+
+
+sub peek {
+   return substr $u, $i, 1;
+}
+
+sub skip_ws {
+   ++$i while peek =~ /\s/;
+}
+
+sub parse_word {
+   skip_ws;
+   my($w, $q, $c);
+   for (;;) {
+      $c= peek;
+      if ($c eq '') {
+         last;
+      } elsif ($c eq '"') {
+         $q= !$q;
+      } elsif ($c =~ /\s/ && !$q) {
+         last;
+      }
+      $w.= $c;
+      ++$i;
+   }
+   return $w;
+}
+
+($p, $u, $c)= /^(\S+)\s+(.*?)\s*(#.*)?$/;
+$c= $c?" $c":"";
+$i= 0;
+while ($w= parse_word) {
+   print "$p $w$c\n";
+}

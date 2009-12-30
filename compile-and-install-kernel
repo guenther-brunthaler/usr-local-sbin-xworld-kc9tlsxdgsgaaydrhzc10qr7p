@@ -1,8 +1,8 @@
 #! /bin/sh
 # Compiles the current kernel with configuration found at at
-# /usr/src/kbuild/target
+# /var/tmp/kernel-output/target
 # and installs it to
-# /boot/image/target
+# /var/tmp/boot_image/target
 # and also the kernel modules to their correct location.
 # After that, all kernel-dependent packages will be re-emerged.
 # The script assumes to be run from within the kernel build directory.
@@ -10,7 +10,7 @@
 
 set -xe
 THERE=`readlink --canonicalize \`pwd -P\``
-cd /usr/src/kbuild/target
+cd /var/tmp/kernel-output/target
 HERE=`readlink --canonicalize \`pwd -P\``
 test x"$HERE" = x"$THERE"
 unset HERE THERE
@@ -29,7 +29,7 @@ if test $SKIPTO -le 2; then
 fi
 if test $SKIPTO -le 3; then
 	echo "*** PHASE 3 ***"
-	make V=1 INSTALL_PATH=/boot/image/target install
+	make V=1 INSTALL_PATH=/var/tmp/boot_image/target install
 fi
 if test $SKIPTO -le 4; then
 	echo "*** PHASE 4 ***"

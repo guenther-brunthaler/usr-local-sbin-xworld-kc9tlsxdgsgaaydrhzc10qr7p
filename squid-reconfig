@@ -1,0 +1,2 @@
+#! /bin/sh
+sh /usr/local/libexec/xworld/sh/snippets/ppp-init.d-runner.sh squid reload

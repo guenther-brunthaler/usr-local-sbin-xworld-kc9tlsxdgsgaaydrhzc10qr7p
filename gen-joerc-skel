@@ -65,6 +65,11 @@ my $USER_prog_x= << '.' . $USER_prog;
 my $USER_prog2_x= << '.' . $USER_prog2;
    -tab 2
 .
+my $USER_autoprog_x= << '.' . $USER_prog_x;
+   -autoindent
+   -smartbacks
+   -smarthome
+.
 my $USER_OCAML_prog= << '.' . $USER_prog2_x;
    -syntax ocaml
 .
@@ -78,11 +83,15 @@ my $USER_SIMPLICITY= << "." . $USER_prog_x;
    *
    +#!\\+\\[ \t]\\+\\[a-z/]/env simple\\>
 .
-my $USER_VALA= << "." . $USER_prog_x . $USER_SIMPLICITY;
+my $USER_VALA= << "." . $USER_autoprog_x
    \40
     Vala source file
    *.gir
+.
+. << "." . $USER_autoprog_x
    *.vala
+.
+. << "." . $USER_autoprog_x . $USER_SIMPLICITY;
    *.vapi
 .
 my $USER_NEWSTUFF= << "." . $USER_prog_x . $USER_VALA;

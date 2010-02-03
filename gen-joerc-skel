@@ -78,7 +78,14 @@ my $USER_SIMPLICITY= << "." . $USER_prog_x;
    *
    +#!\\+\\[ \t]\\+\\[a-z/]/env simple\\>
 .
-my $USER_NEWSTUFF= << "." . $USER_prog_x . $USER_SIMPLICITY;
+my $USER_VALA= << "." . $USER_prog_x . $USER_SIMPLICITY;
+   \40
+    Vala source file
+   *.gir
+   *.vala
+   *.vapi
+.
+my $USER_NEWSTUFF= << "." . $USER_prog_x . $USER_VALA;
    \40
     Completely new entries.
    \40

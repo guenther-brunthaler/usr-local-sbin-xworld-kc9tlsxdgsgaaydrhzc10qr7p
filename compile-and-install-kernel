@@ -37,8 +37,12 @@ if test $SKIPTO -le 4; then
 fi
 if test $SKIPTO -le 5; then
 	echo "*** PHASE 5 ***"
+	PS_MAP_LOCATION=/boot
+	test -d "$PS_MAP_LOCATION"
+	KV=`make -s kernelrelease`
 	tar -cf survive.tar modules.order Module.symvers System.map
 	make clean
 	tar -xf survive.tar && rm survive.tar
+	cp System.map "$PS_MAP_LOCATION"/System.map-"$KV"
 fi
 make -s kernelrelease

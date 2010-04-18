@@ -166,6 +166,10 @@ my @changes= (
      {trigger => ' -backpath', add => << '.'}
       -backpath $HOME/.editor-backups
 .
+   , {trigger => ' -break_hardlinks', add => << '.'}
+       This is exactly what we want: Break hard links, but not symlinks.
+      -break_hardlinks
+.
    , {trigger => ' -break_links', add => << '.'}
        Although this would be nice in order to break hard links,
        it unfortunately also breaks symlinks, rendering this

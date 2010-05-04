@@ -59,6 +59,9 @@ show_help() {
 MOPT_VFAT_BASE="utf8=true,uid=operator,gid=plugdev"
 MOPT_VFAT_RW="noatime,umask=117,dmask=007"
 MOPT_VFAT_RO="ro,umask=337,dmask=227"
+PREFER_IOSCHEDULER=anticipatory
+IOSCHEDULER_MODULE=as_iosched
+IOSCHED_SYSPATH="/sys/block/*/queue/scheduler"
 
 
 die() {
@@ -99,6 +102,36 @@ wrL() {
 }
 
 
+write_to() {
+	run printf '%s\n' "$1" > "$2"
+}
+
+
+silent() {
+	"$@" > /dev/null 2>& 1
+}
+
+
+inform() {
+	if
+		test -n "$VERBOSE"
+	then
+		run printf '%s\n' "$*" >& 2
+	fi
+}
+
+
+when_real() {
+	if
+		test -z "$CPFX"
+	then
+		"$@"
+	else
+		echo "SIMULATION: $*" >& 2
+	fi
+}
+
+
 APP=${0##*/}
 # Determine output line width.
 LINEWIDTH=
@@ -107,21 +140,26 @@ tty -s <& 1 && system tput cols
 LINEWIDTH=${REPLY:-70}
 # Start of command line processing.
 # Define presets.
-VERBOSE=0
+VERBOSE=
 DRY=0
 READ_ONLY=0
 MAKE_MP=0
 ADD_OPT=
 #
 COPTS=
-while true; do
-	if [ -z "$COPTS" ]; then
+while :
+do
+	if
+		test -z "$COPTS"
+	then
 		case "$1" in
 			-?*) COPTS="$1"; shift;;
 			*) break;;
 		esac
 	fi
-	if [ "${COPTS#--}" = "$COPTS" ]; then
+	if
+		test "${COPTS#--}" = "$COPTS"
+	then
 		TAIL="${COPTS#-?}"; # Switch clustering.
 		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
 	else
@@ -130,7 +168,7 @@ while true; do
 	# Any arguments are at $1 and onwards; must be shifted off.
 	case "$COPT" in
 		--) break;; # Must be first!
-		--verbose | -v) VERBOSE=1;;
+		--verbose | -v) VERBOSE=Y;;
 		--dry-run | --simulate | -n) DRY=1;;
 		--read-only | -r) READ_ONLY=1;;
 		--options | -o) ADD_OPT="$1"; shift;;
@@ -153,38 +191,100 @@ test $# = 0 || die "Unexpected excess arguments: $*"
 CPFX=
 test $DRY = 1 && CPFX=echo
 OPT="$MOPT_VFAT_BASE"
-if [ "$READ_ONLY" -ne 0 ]; then
+if
+	test "$READ_ONLY" -ne 0
+then
 	OPT="$MOPT_VFAT_RO,$OPT"
 else
 	OPT="$MOPT_VFAT_RW,$OPT"
 fi
 OPT="$OPT${ADD_OPT:+,}$ADD_OPT"
-if [ ! -b "$DEVICE" ]; then
-	if [ -f "$DEVICE" ]; then
+if
+	test -b "$DEVICE"
+then
+	system readlink -f "$DEVICE"; REAL_PATH=$REPLY
+	if
+		test x"$REAL_PATH" != x"$DEVICE"
+	then
+		inform "The resolved device path is '$REAL_PATH'."
+	fi
+	REAL_PATH=${REAL_PATH##*/}
+	while
+		REPLY=${REAL_PATH%[0-9]}
+		test x"$REAL_PATH" != x"$REPLY"
+	do
+		REAL_PATH=$REPLY
+	done
+	REAL_PATH=${IOSCHED_SYSPATH%%'*'*}$REAL_PATH${IOSCHED_SYSPATH##*'*'}
+	if
+		test -f "$REAL_PATH"
+	then
+		FLAG=0
+		while
+			system cat "$REAL_PATH"
+			test x"${REPLY%${PREFER_IOSCHEDULER}*}" = x"$REPLY"
+		do
+			test $FLAG = 1 && break
+			inform "Trying to load i/o scheduler module" \
+				"'$IOSCHEDULER_MODULE'."
+			when_real silent modprobe "$IOSCHEDULER_MODULE"
+			when_real run sleep 1
+			FLAG=1
+		done
+		if
+			system cat "$REAL_PATH"
+			test x"${REPLY%'['$PREFER_IOSCHEDULER']'*}" \
+				= x"$REPLY"
+		then
+			inform "Changing i/o scheduler for device to" \
+				"'$PREFER_IOSCHEDULER'."
+			when_real write_to "$PREFER_IOSCHEDULER" "$REAL_PATH"
+		fi
+	fi
+else
+	if
+		test -f "$DEVICE"
+	then
+		inform "Device seems to be an image file;" \
+			"will try to loop-mount it."
 		OPT="$OPT${OPT:+,}loop"
 	else
 		die "'$DEVICE' is neither an image file" \
 			" nor a block special device!"
 	fi
 fi
-if [ -e "$MOUNT_POINT" ]; then
-	if [ ! -d "$MOUNT_POINT" ]; then
+if
+	test -e "$MOUNT_POINT"
+then
+	if
+		test ! -d "$MOUNT_POINT"
+	then
 		die "Mount point '$MOUNT_POINT' is not a directory!"
 	fi
-elif [ "$MAKE_MP" -ne 0 ]; then
-	if ! $CPFX mkdir "$MOUNT_POINT"; then
+elif test "$MAKE_MP" -ne 0
+then
+	if
+		! when_real mkdir "$MOUNT_POINT"
+	then
 		die "Cannot create mount point directory '$MOUNT_POINT'!"
 	fi
-	if ! $CPFX chown nobody:nogroup "$MOUNT_POINT"; then
+	if
+		! when_real chown nobody:nogroup "$MOUNT_POINT"
+	then
 		die "Cannot set owner for mount point '$MOUNT_POINT'!"
 	fi
-	if ! $CPFX chmod 0 "$MOUNT_POINT"; then
+	if
+		! when_real chmod 0 "$MOUNT_POINT"
+	then
 		die "Cannot set permissions for mount point '$MOUNT_POINT'!"
 	fi
+	inform "Created new mount point directory '$MOUNT_POINT'."
 else
 	die "Mount point '$MOUNT_POINT' does not exist!"
 fi
-if ! $CPFX mount -o"$OPT" "$DEVICE" "$MOUNT_POINT"; then
+if
+	! when_real mount -o"$OPT" "$DEVICE" "$MOUNT_POINT"
+then
 	die "Could not mount '$DEVICE' as '$MOUNT_POINT'!"
 fi
-test -n "$VERBOSE" && echo "Successfully mounted!"
+inform "Successfully mounted!"

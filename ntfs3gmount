@@ -1,10 +1,5 @@
 #! /bin/sh
 # Mount a NTFS-3G volume using appropriate options.
-#
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/ntfs3gmount $
-# $Author: root $
-# $Date: 2007-06-03T10:31:51.681251Z $
-# $Revision: 780 $
 
 
 MOPT_NTFS3G_BASE="streams_interface=windows,silent"
@@ -45,8 +40,11 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 1.0
-	Written by Guenther Brunthaler in 2007.
+	Version 10.124
+	(c) 2007 - 2010 by Guenther Brunthaler.
+
+	This script is free software.
+	Distribution is permitted under the terms of the GPLv3.
 .
 }
                                                                                                                              
@@ -77,7 +75,7 @@ while true; do
 		esac
 	fi
 	if [ "${COPTS#--}" = "$COPTS" ]; then
-		TAIL="${COPTS#-?}"; # Switch custering.
+		TAIL="${COPTS#-?}"; # Switch clustering.
 		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
 	else
 		COPT="$COPTS"; COPTS=

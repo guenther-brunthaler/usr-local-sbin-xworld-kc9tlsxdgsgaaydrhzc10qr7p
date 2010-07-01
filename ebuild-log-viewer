@@ -1,0 +1,79 @@
+#! /usr/bin/env lua
+-- Viewer for elog files.
+--
+-- (c) 2010 by Guenther Brunthaler.
+-- This script is free software.
+-- Distribution is permitted under the terms of the GPLv3.
+         
+
+local log_dir= "/var/log/ebuilds/elog"
+local logs= {}
+do
+   local line, cat, pkg, date
+   local cmd= string.format("ls -1 -- '%s'", log_dir)
+   local dir= assert(io.popen(cmd))
+   while true do
+      line= dir:read()
+      if not line then break; end
+      cat, pkg, date= string.match(line, "^([^:]-):([^:]+):([^:]-)%.log$")
+      if cat then
+         date= string.format(
+               "%04u-%02u-%02u %02u:%02u:%02u"
+            ,  string.match(
+                  date, "^(%d%d%d%d)(%d%d)(%d%d)-(%d%d)(%d%d)(%d%d)$"
+               )
+         )
+         table.insert(logs, {pkg= cat .. '/' .. pkg, file= line, date= date})
+      end
+   end
+   assert(dir:close())
+end
+table.sort(logs, function (e1, e2) return e1.date < e2.date; end)
+do
+   local line, cmd, ok, err
+   local separator= string.rep("-", 75)
+   for _, log in ipairs(logs) do
+      cmd= "view"
+      repeat
+         print(separator)
+         print(string.format('%s Package "%s":', log.date, log.pkg))
+         if cmd == "view" then
+            os.execute(
+               string.format("less -- '%s'", log.file)
+            )
+         end
+         assert(
+            io.write("D)elete, skip to n)ext, v)iew again or quit [dnVq]? ")
+         );
+         assert(io.flush());
+         line= io.read()
+         print ""
+         if not line or string.match(line, "^%s*$") then
+            line= "v"
+         else
+            line= string.lower(line)
+         end
+         line= string.match(line, "^%s*(%S)")
+         if line == "n" then
+            cmd= "next"
+         elseif line == "d" then
+            print(string.format('Deleting file "%s"', log.file))
+            ok, err= os.remove(log.file)
+            if ok then
+               cmd= "next"
+            else
+               print("Failed to delete file: " .. msg)
+               cmd= nil
+            end
+         elseif line == "v" then
+            cmd= "view"
+         elseif line == "q" then
+            print "Good bye."
+            return
+         else
+            print "I beg your pardon?"
+            cmd= nil
+         end
+      until cmd == "next"
+   end
+end

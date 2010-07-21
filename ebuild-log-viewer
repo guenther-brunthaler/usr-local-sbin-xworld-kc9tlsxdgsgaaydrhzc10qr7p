@@ -7,6 +7,10 @@
          
 
 local log_dir= "/var/log/ebuilds/elog"
+
+-- logs[INDEX].pkg == LIKE("sys-apps/coreutils-8.5").
+-- logs[INDEX].date == LIKE("2010-07-21 12:57:58").
+-- logs[INDEX].file == LIKE("sys-apps:coreutils-8.5:20100721-125758.log").
 local logs= {}
 do
    local line, cat, pkg, date
@@ -30,16 +34,22 @@ do
 end
 table.sort(logs, function (e1, e2) return e1.date < e2.date; end)
 do
-   local line, cmd, ok, err
+   local line, cmd, ok, err, first
    local separator= string.rep("-", 75)
    for _, log in ipairs(logs) do
       cmd= "view"
+      assert(os.execute("clear"))
+      first= true
       repeat
-         print(separator)
+         if first then
+            first= false
+         else
+            print(separator)
+         end
          print(string.format('%s Package "%s":', log.date, log.pkg))
          if cmd == "view" then
             os.execute(
-               string.format("less -- '%s'", log.file)
+               string.format("less -- '%s/%s'", log_dir, log.file)
             )
          end
          assert(
@@ -58,7 +68,7 @@ do
             cmd= "next"
          elseif line == "d" then
             print(string.format('Deleting file "%s"', log.file))
-            ok, err= os.remove(log.file)
+            ok, err= os.remove(string.format("%s/%s", log_dir, log.file))
             if ok then
                cmd= "next"
             else

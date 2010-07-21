@@ -12,6 +12,17 @@ local log_dir= "/var/log/ebuilds/elog"
 -- logs[INDEX].date == LIKE("2010-07-21 12:57:58").
 -- logs[INDEX].file == LIKE("sys-apps:coreutils-8.5:20100721-125758.log").
 local logs= {}
+if #arg > 0 then
+   local app= string.match(arg[0], "[^/]+$")
+   if #arg ~= 1 or arg[1] ~= "--version" and arg[1] ~= "-V" then
+      io.stderr:write(string.format("Usage: %s [--version | -V]\n", app))
+   end
+   print(string.format("%s version %s\n", app, "10.202"))
+   print "(c) 2010 by Guenther Brunthaler."
+   print "This script is free software."
+   print "Distribution is permitted under the terms of the GPLv3."
+   return
+end
 do
    local line, cat, pkg, date
    local cmd= string.format("ls -1 -- '%s'", log_dir)

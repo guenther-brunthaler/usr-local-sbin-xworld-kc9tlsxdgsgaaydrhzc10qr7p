@@ -4,12 +4,8 @@
 # in the Gentoo system.
 # This will typically be required on a major GCC upgrade.
 #
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/recompile-entire-system $
-# $Author: root $
-# $Date: 2006-11-16T06:03:41.117352Z $
-# $Revision: 404 $
-#
-# Written in 2006 by Guenther Brunthaler
+my $VERSION= '10.251';
+my $written= '(c) 2006-2010 Guenther Brunthaler';
 
 
 use strict;
@@ -21,22 +17,21 @@ use Getopt::Long;
 my $script= "recompile-remaining-packages";
 
 
-my $script_header= << '.';
-#!/bin/bash
+my $script_header= &expand_specials(<< '.');
+#! /bin/bash
 #
 # Run this script repeatedly (if interrupted)
 # until no more packages will be compiled.
 #
-# $Date: 2006-11-16T06:03:41.117352Z $
-# $Revision: 404 $
-# Written in 2006 by Guenther Brunthaler
+# Version @VERSION@
+# @written@
 
 
-SCRIPT_VERSION="1.13"
+SCRIPT_VERSION=@VERSION@
 
 
 die() {
-	echo "ERROR: $*" >& 2; exit 1
+	echo "ERROR: $*" >& 2; false; exit
 }
 
 RM() {
@@ -77,7 +72,7 @@ item() {
 }
 
 
-BASENAME="${0##*/}"
+BASENAME=${0##*/}
 STATE_FILE="$HOME/.$BASENAME.state"
 FAILURES_FILE="$HOME/.$BASENAME.failures"
 LOG_FILE="!<LOGDIR>!/${BASENAME}_$(date '+%Y-%m-%d_%T').log"
@@ -162,12 +157,11 @@ fi
 RM "$FAILURES_FILE"; RM "$STATE_FILE"
 .
 
-my $info1= << '.';
+my $info1= &expand_specials(<< '.');
 Recompile Entire System Helper
 
-Script version as of $Date: 2006-11-16T06:03:41.117352Z $
-
-Written in 2006 by Guenther Brunthaler
+Version @VERSION@
+@written@
 
 This script will generate another script to be run by you. That other script
 will then recompile each and every package in the whole system in the correct
@@ -195,6 +189,14 @@ get the guide.
 Press [Enter] now to continue if you dare.
 
 .
+
+
+sub expand_specials {
+   my $t= $_[0];
+   $t =~ s/\@VERSION\@/$VERSION/g;
+   $t =~ s/\@written\@/$written/g;
+   return $t;
+}
 
 
 # Remove the largest common whitespace prefix from all lines
@@ -328,15 +330,17 @@ Getopt::Long::Configure("bundling");
 my $logdir= substr $home, 0, length($home) - 1;
 my $pkgs;
 my $emerge_opts= '--oneshot --nodeps';
+my $names_only;
+my $prog= $0;
+$prog =~ s!.*[/\\]!!;
 GetOptions(
      'p|package-list=s' => \$pkgs
    , 'd|log-dir=s' => \$logdir
    , 'e|emerge-options=s' => \$emerge_opts
    , 'o|output-script-name=s' => \$script
+   , 'n|names-only' => \$names_only
    , 'h|help' => sub {
-      my $prog= $0;
-      $prog =~ s!.*[/\\]!!;
-      pwrap << ".";
+      pwrap expand_specials << ".";
          $prog - generate a bulk emerge script
          
          $prog creates a package list from the combined output of
@@ -404,6 +408,19 @@ GetOptions(
             This allows to override the default name of the script which will
             be generated. It will always be generated in the user's home
             directory.
+         
+         --names-only\\
+         -n
+         
+            By default, the exact package versions will be included in the
+            generated script. With this version, the version numbers will be
+            stripped. This leads to installation of the newest version of that
+            package. Beware that this option might be dangerous, because
+            sometimes package dependencies require older versions of a
+            dependency in order to work. This option assumes the current list
+            of packages contains version numbers. It must therefore not be
+            used if the --package-list is also used and the entries in the
+            user-provided package list do not all have version numbers.
 
          --help\\
          -h
@@ -415,7 +432,8 @@ GetOptions(
             if the above text scrolled off your screen before you could read
             it.
 
-         $prog was written in 2006 by Guenther Brunthaler.
+         $prog Version \@VERSION\@\\
+         \@written\@.
 .
       exit;
    }
@@ -426,7 +444,7 @@ if (-e $script) {
 }
 my($n, $tmp);
 unless ($pkgs) {
-   pwrap "$0 -", $info1;
+   pwrap "$prog -", $info1;
    <STDIN>;
    $tmp= tmpnam or die "No temporary file names left";
    print "Collecting list of packages and evaluating installation order...\n";
@@ -436,7 +454,7 @@ unless ($pkgs) {
       sys-libs/glibc
       sys-devel/binutils
    );
-   my $r= join '|', map quotemeta, @head;
+   my $r= join '|', map quotemeta, @head;   
    $r= qr/ ^ (?: $r ) - \d /x;
    open OUT, (
       '| sort -k1,1 | sort -suk3,3 | sort -nk2,2 | sort -sk1,1 '
@@ -459,7 +477,81 @@ unless ($pkgs) {
             }
             print OUT "$t ", ++$n;
             field3:
-            print OUT " =$_\n";
+            if ($names_only) {
+               if (
+                  /
+                     \G .*?
+                     ( # $1.
+                        (?:
+                           # Optional prefix and category.
+                           (?:
+                              # Comparison prefixes.
+                              ( # $2.
+                                 < | <= | = | >= | >
+                              )
+                           )?
+                           ( # $3.
+                              # Category.
+                              [a-zA-z0-9+_] [-a-zA-z0-9+_]*
+                           )
+                           \/
+                        )?
+                        ( # $4.
+                           # Package base name.
+                           (?: [a-zA-z0-9+_] [-a-zA-z0-9+_]*? )?
+                           [a-zA-z0-9+_]
+                        )
+                        # Optional "-version-revision"-part.
+                        (?:
+                           -
+                           ( # $5.
+                              # Package version.
+                              (?: cvs \. )?
+                              # Main part of version number.
+                              \d+ (?: \. \d+ )*
+                              [a-z]?
+                              (?: _ (?: pre | p | beta | alpha | rc ) \d* )*
+                           )
+                           # Option -r revision suffix.
+                           (?:
+                              # Revision $rev.
+                              -
+                              ( # $6.
+                                 r \d+
+                              )
+                           )?
+                        )?
+                        # Optional ":something" package-slot name.
+                        (?:
+                           :
+                           ( # $7.
+                              # Package version.
+                              (?: cvs \. )?
+                              # Main part of version number.
+                              \d+ (?: \. \d+ )*
+                              [a-z]?
+                              (?: _ (?: pre | p | beta | alpha | rc ) \d* )*
+                              # Optional -r revision suffix.
+                              (?:
+                                 # Revision $rev.
+                                 - r \d+
+                              )?
+                           )
+                        )?
+                        # Terminator.
+                        (?: (?= [^-+_[:alnum:]] ) | $ )
+                     )
+                  /xg
+               ) {
+                  $_= "$3/$4";
+                  $_.= ":$7" if $7;
+               } else {
+                  die "No correct package+version syntax in entry '$_'!";
+               }
+            } else {
+               substr($_, 0, 0)= '=';
+            }
+            print OUT " $_\n";
          }
       }
       close IN or die $!;
@@ -480,12 +572,9 @@ while (defined($_= <IN>)) {
          chomp;
          die "Bad package name '$_' in file '$pkgs'";
       }
-   } else {
-      next if m!^=sys-devel/gcc!; # It's already up to date!
    }
    print OUT "item $n $_"; ++$n;
 }
-$script_tail =~ s///;
 print OUT $script_tail;
 close OUT or die "Could not finish writing '$script': $!";
 close IN or die $!;

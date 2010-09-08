@@ -1,22 +1,99 @@
 #! /bin/sh
-# Synchronize shared libraries for root jail or initrd.
-# Run this script without arguments for help.
-#
-# May be distributed under the terms of the GPLv3.
-#
-# (c) 2008 by Guenther Brunthaler.
+show_version() {
+	wr <<- .
+	$APP version 10.251
+
+	(c) 2008-2010 by Guenther Brunthaler.\n
+	Distribution is permitted under the terms of the GPLv3.
+.
+}
+APP=${0##*/}
+
+
+show_help() {
+	wr <<- .
+	$APP - Synchronize shared libraries for root jail or initrd
+	
+	Usage: $APP [ options ]
+
+	Run $APP from the directory containing the directory tree which
+	which shall become the root-directory of your root jail (or initrd) at
+	some later time.
+
+	$APP will first remove any old contents of ./lib in order to avoid
+	keeping around outdated dependencies.
+	
+	It will then recursively scan all executables in the directory tree
+	for required shared library dependencies, and will copy all those
+	libraries from your real filesystem into ./lib.
+	
+	Next, any libraries required by the newly copied libraries themselves
+	will be copied in the same way, and so on, until all dependencies have
+	been resolved successfully.
+	
+	Finally, all required symlinks in ./lib will be set up as well.
+	
+	The net result of running $APP is that ./lib will contain all
+	required libraries (no need for a ./usr/lib).
+	
+	It should especially *not* be necessary to use ldconfig to create a
+	linker cache or setting up the LD_LIBRARY_PATH environment variable
+	when actually using the root jail - the root jail or initrd should
+	work right out of the box now.
+	
+	Options:
+	
+	-h: Show this help.\n
+	-V: Show only the version information.
+.
+	echo
+	show_version
+}
 
 
 die() {
 	echo "ERROR: $*" >& 2
-	exit 1
+	false; exit
 }
 
 
 run() {
-	"$@" && return
-	die "Cannot execute >>>$*<<<: Return code ${?}!"
+	"$@" || die "Could not execute >>>$*<<<: Return code ${?}!"
 }
+
+
+system() {
+	REPLY=`run "$@"` || exit
+}
+
+
+print() {
+	run printf '%s' "$*"
+}
+
+
+println() {
+	run printf '%s\n' "$*"
+}
+
+
+wr() {
+	local REPLY
+	while IFS= read -r
+	do
+		{
+			while test -n "$REPLY" || IFS= read -r
+			do
+				ORIG=$REPLY; REPLY=${REPLY%\\n}
+				println "$REPLY"
+				test x"$ORIG" != x"$REPLY"  && break
+				REPLY=
+			done
+		} | run fmt -w "$LINEWIDTH" || exit
+	done
+}
+# Determine up line width to use for output.
+LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
 
 
 libfilter() {
@@ -46,53 +123,19 @@ tfile() {
 
 wrout() {
 	if test $# = 0; then
-		fmt -w `tput cols`
+		wr
 	else
-		printf "%s\n" "$*" | wrout
+		printf "%s\n" "$*" | wr
 	fi
 }
 
 
-APP=${0##*/}
-cat <<-. | wrout | less -F
-
-	$APP - Synchronize Required Libraries For Root Jails
-
-	Run this script from the directory containing the directory tree which
-	which shall become the root-directory of your root jail (or initrd) at
-	some later time.
-
-	$APP will first remove the old contents of ./lib in order to avoid
-	keeping around outdated dependencies.
-	
-	It will then recursively scan all executables in the directory tree
-	for required shared library dependencies, and will copy all those
-	libraries from your real filesystem into ./lib.
-	
-	Next, any libraries required by the newly copied libraries themselves
-	will be copied in the same way, and so on, until all dependencies have
-	been resolved successfully.
-	
-	Finally, all required symlinks in ./lib will be set up as well.
-	
-	The net result of running $APP is that ./lib will contain all
-	required libraries (no need for a ./usr/lib).
-	
-	It should especially *not* be necessary to use ldconfig to create a
-	linker cache or setting up the LD_LIBRARY_PATH environment variable
-	when actually using the root jail - the root jail or initrd should
-	work right out of the box now.
-	
-	$APP may be distributed under the terms of the GPLv3.
-	
-	$APP (c) 2008 by Guenther Brunthaler.
-
-.
+show_help | less -F
 read -p "Press Enter to continue or Ctrl-C to abort. " DUMMY
 echo
-PWD=`pwd`
+system pwd; PWD=$REPLY
 run test -d lib && run test "x$PWD" != x/
-run rm lib/*so*
+find lib -name '*.so*' -type f -exec rm "{}" \;
 tfile NAMES
 wrout "Collecting executables in '$PWD'-subtree..."
 run find -xdev -type f -executable > $NAMES
@@ -104,7 +147,7 @@ tfile CANDIDATES
 wrout "Determining referenced shared libraries..."
 run paste -d: $NAMES $FILED | run grep ELF | run grep executable \
 	| run cut -d: -f1 | run sort -u \
-	| while read FILE; do
+	| while IFS= read -r FILE; do
 		ldd "$FILE" 2> /dev/null
 	done | libfilter | run sort -u > $CANDIDATES
 tfile DLLS
@@ -112,21 +155,21 @@ wrout "Determining nested shared library dependencies..."
 while true; do
 	run cat $CANDIDATES > $DLLS
 	ANY=
-	while read FILE; do
+	while IFS= read -r FILE; do
 		ldd "$FILE" 2> /dev/null | libfilter \
-		| while read DLL; do
-			fgrep -x "$DLL" > /dev/null 2>&1 && continue
-			printf "%s\n" "$DLL" >> $DLLS
+		| while IFS= read -r DLL; do
+			fgrep -x "$DLL" > /dev/null 2>& 1 && continue
+			run printf "%s\n" "$DLL" >> $DLLS
 			ANY=Y
 		done
 	done < $CANDIDATES
 	test -n "$ANY" || break
-	sort -u < $DLLS > $CANDIDATES
+	run sort -u < $DLLS > $CANDIDATES
 done
 wrout "Copying all referenced shared libraries to '$PWD/lib'..."
-while read FILE; do
+while IFS= read -r FILE; do
 	while test -L "$FILE"; do
-		FILE=`readlink --canonicalize "$FILE"`
+		system readlink -f "$FILE"; FILE=$REPLY
 	done
 	DF=lib/${FILE##*/}
 	run cp -va "$FILE" "$DF"
@@ -134,7 +177,7 @@ done < $CANDIDATES
 run rm $NAMES $FILED $DLLS $CANDIDATES
 wrout "Running ldconfig to create any required symlinks" \
 	"(using '`pwd`' as '/')..."
-ldconfig -v -r . -N -f /dev/null || die "Cannot update library symlinks!"
+/sbin/ldconfig -v -r . -N -f /dev/null || die "Cannot update library symlinks!"
 echo
 wrout "Success! '$PWD/lib' now contains all shared libraries" \
 	"which are required by the executables in '$PWD'."

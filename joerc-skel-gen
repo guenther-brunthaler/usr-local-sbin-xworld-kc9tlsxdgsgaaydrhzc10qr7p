@@ -194,6 +194,7 @@ my @changes= (
       ], add => $USER_prog
    }
    , {trigger => [qw/*.tex *.sty/], add => $USER_pnowrap}
+   , {trigger => "*.txt", add => $USER_nowrap}
    , {trigger => [qw/*.asm *.s *.S/], add => $USER_nowrap}
    , {
       trigger => [qw/*.sml *.ml *.mli/]

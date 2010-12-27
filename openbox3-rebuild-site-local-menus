@@ -22,5 +22,7 @@ system() {
 system dirname "$MENU_FILE"
 run test -d "$REPLY"
 run test -w "$REPLY"
-run mmaker -c OpenBox3 > "$MENU_FILE"
+run mmaker -c OpenBox3 \
+	| run sed -e 's,\([^A-Za-z]\)xterm\([^<]\),\1roxterm\2,g' \
+	> "$MENU_FILE"
 echo "Success! Menu file has been written to '$MENU_FILE'!"

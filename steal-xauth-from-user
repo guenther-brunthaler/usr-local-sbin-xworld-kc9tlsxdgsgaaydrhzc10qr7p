@@ -1,6 +1,6 @@
 #! /bin/sh
 # Allows root to steal the X authorization cookie from a specified user.
-# Written in 2007 by Guenther Brunthaler.
+# Written 2007 - 2011 by Guenther Brunthaler.
 
 
 die() {
@@ -9,12 +9,31 @@ die() {
 }
 
 
-USERNAME=${1?Usage $0 <username>}
-USERHOME=`awk -F: '$1 == "'$USERNAME'" {print $6}' < /etc/passwd`
-if test -z "$USERHOME" || test ! -d "$USERHOME"; then
-	die "Invalid user!"
-fi
+gethome() {
+	LC_ALL=C USERHOME=`awk -F: '$1 == "'$1'" {print $6}' < /etc/passwd`
+	if
+		test -z "$USERHOME" || test ! -d "$USERHOME"
+	then
+		die "Invalid user '$1'!"
+	fi
+}
+
+
+USERNAME0=${1?Usage $0 <username> [ <receiving_user> ]}
+gethome "$USERNAME0"; USERHOME0=$USERHOME
+USERNAME=${2:-root}
+gethome "$USERNAME"
 unset XAUTHORITY
-xauth -f "$USERHOME"/.Xauthority extract - "$DISPLAY" | xauth merge - \
-	|| die "Could not import user $USERNAME's xauth cookie!"
-echo "Xauth cookie from user $USERNAME has been imported successfully!"
+XA0="$USERHOME0"/.Xauthority
+XA="$USERHOME"/.Xauthority
+test -f "$XA0" || die "Could not find authority database '$XA0'!"
+if
+	test '!' -e "$XA"
+then
+	touch "$XA" || die "Could not create authority database '$XA'!"
+fi
+xauth -f "$XA0" extract - "$DISPLAY" | xauth -f "$XA" merge - \
+	|| die "Could not import user $USERNAME0's xauth cookie!"
+chown "$USERNAME:$USERMAME" "$XA" || die "chown failed for '$XA'!"
+echo "Xauth cookie from user $USERNAME0 has been imported successfully"
+echo "for user $USERNAME!"

@@ -1,9 +1,9 @@
 #! /bin/sh
 show_version() {
 	wr . <<-.
-	$APP version 10.228
+	$APP version 11.105
 
-	(c) 2009 - 2010 by Guenther Brunthaler.
+	(c) 2009 - 2011 by Guenther Brunthaler.
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
@@ -125,7 +125,7 @@ show_help() {
 	containers supported by $APP.
 	
 	In addition to binary key files, files containing text passwords can
-	only be used. Any such files must also be present in the key files
+	also be used. Any such files must also be present in the key files
 	directory, but have a file extension ".psw" instead of ".key".
 	
 	Either a password file, a key file, or both must be present.
@@ -168,6 +168,7 @@ wr() {
 		run fmt $S -w $LINEWIDTH
 	fi
 }
+LINEWIDTH=; REPLY=; tty -s <& 1 && system tput cols; LINEWIDTH=${REPLY:-70}
 
 
 inform() {
@@ -175,11 +176,17 @@ inform() {
 }
 
 
+# Return binary MD5 checksum of stdin.
+# The ($HALF+1)th 512-byte chunk will be used for calculating the checksum.
 chksum() {
-	run md5sum -b | run cut -d' ' -f1
+	run dd bs=512 skip=$HALF count=1 2> /dev/null \
+		| run md5sum -b | run cut -d' ' -f1
 }
 
 
+# Probe all *.hdr files in $DIR whether they match $MD5SUM.
+# The ($HALF+1)th 512-byte chunk will be used for calculating the checksum.
+# If found, the first matching file name is printed.
 find_file() {
 	find "$DIR" -type f -name "*.hdr" | while read FILE
 	do
@@ -241,11 +248,6 @@ tc_psw_wrapper() {
 
 
 APP=${0##*/}
-# Determine output line width.
-LINEWIDTH=
-REPLY=
-tty -s <& 1 && system tput cols
-LINEWIDTH=${REPLY:-70}
 # Start of command line processing.
 # Define presets.
 TC_BIN=truecrypt-4
@@ -314,17 +316,26 @@ then
 	run test -d "$MP"
 	system readlink -f "$MP"; MP=$REPLY
 fi
-MD5SUM=`
-	"$TC_BIN" --backup-headers /dev/stderr "$DEV" 2>& 1 > /dev/null \
-		| chksum
-`
-inform "TrueCrypt header checksum of \"$DEV\" is $MD5SUM!"
 run test -f "$PWLIST"
 system readlink -f "$PWLIST"; PWLIST=$REPLY
 system dirname "$PWLIST"; DIR=$REPLY
 system readlink -f "$DIR/.."; DIR=$REPLY
 system readlink -f "$DIR/$VOLHEADERS_RELPATH"; DIR=$REPLY
-FILE=`find_file`
+for HALF in 0 1
+do
+	MD5SUM=`
+		"$TC_BIN" --backup-headers /dev/stderr "$DEV" \
+			2>& 1 > /dev/null \
+		| chksum
+	`
+	case $HALF in
+		0) T=normal;;
+		1) T=hidden;;
+	esac
+	inform "TrueCrypt $T header checksum of \"$DEV\" is $MD5SUM!"
+	FILE=`find_file`
+	test -n "$FILE" && break
+done
 test -n "$FILE" || die "Could not look up encryption key!"
 inform "Matching header \"$FILE\" found in store."
 FILE=${FILE#$DIR/}

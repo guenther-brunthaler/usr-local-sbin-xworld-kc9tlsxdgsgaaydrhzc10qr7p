@@ -19,13 +19,33 @@ gethome() {
 }
 
 
-USERNAME0=${1?Usage $0 <username> [ <receiving_user> ]}
-gethome "$USERNAME0"; USERHOME0=$USERHOME
+guess() {
+	ps -A --format args | sed -e '
+		s,^/usr/bin/X \([^ ]\+ \+\)*-auth \+\([^ ]\+\)\($\| .*\),\2,
+		t; d
+	'
+}
+
+
+test -n "$DISPLAY" || die '$DISPLAY is not set!'
+USERNAME0=${1?Usage $0 <username_or_?_or_authfile> [ <receiving_user> ]}
+if test x"$USERNAME0" = x'?'
+then
+	XA0=`guess`
+	test -n "$XA0" || die "Could not guess -auth file" \
+		"of running X11 server!"
+	USERNAME0=$XA0
+elif test x"${USERNAME0#/}" != x"$USERNAME0"
+then
+	XA0=$USERNAME0
+else
+	gethome "$USERNAME0"; USERHOME0=$USERHOME
+	XA0="$USERHOME0"/.Xauthority
+fi
 USERNAME=${2:-root}
 gethome "$USERNAME"
-unset XAUTHORITY
-XA0="$USERHOME0"/.Xauthority
 XA="$USERHOME"/.Xauthority
+unset XAUTHORITY
 test -f "$XA0" || die "Could not find authority database '$XA0'!"
 if
 	test '!' -e "$XA"
@@ -35,5 +55,5 @@ fi
 xauth -f "$XA0" extract - "$DISPLAY" | xauth -f "$XA" merge - \
 	|| die "Could not import user $USERNAME0's xauth cookie!"
 chown "$USERNAME:$USERMAME" "$XA" || die "chown failed for '$XA'!"
-echo "Xauth cookie from user $USERNAME0 has been imported successfully"
+echo "Xauth cookie from user/file $USERNAME0 has been imported successfully"
 echo "for user $USERNAME!"

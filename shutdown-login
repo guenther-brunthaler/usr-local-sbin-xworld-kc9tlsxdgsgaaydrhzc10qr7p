@@ -12,7 +12,7 @@ DEFAULT=5
 
 abort() {
 	echo "Aborting. Not shutting down."
-	read -p "Press Enter to continue. "
+	read -p "Press Enter to continue. " REPLY
 	clear
 	exit 0
 }
@@ -48,7 +48,7 @@ done
 echo
 echo "Do nothing in order to wait for the shutdown to occur."
 echo "Or press [Enter] in order to abort the shutdown."
-read
+read REPLY
 "$SHUTDOWN" -c 2> /dev/null
 sleep 2
 echo

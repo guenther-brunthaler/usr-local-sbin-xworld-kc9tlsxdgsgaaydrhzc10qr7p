@@ -80,7 +80,7 @@ if "$PROG"; then
 else
 	inform warning "WARNING" \
 		"Run of \"$PROG\" failed with return code $?!"
-	read -t "$TIMEOUT" -p "${INDENT}Press Enter to continue. " || {
+	read -t "$TIMEOUT" -p "${INDENT}Press Enter to continue. " REPLY || {
 		echo "(timeout)"
 	}
 fi

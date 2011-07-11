@@ -34,7 +34,7 @@ echo
 while true; do
 	REPLY=
 	read -t 120 -p \
-	"Delay before shutdown in minutes or 'a' to abort [$DEFAULT]? "
+	"Delay before shutdown in minutes or 'a' to abort [$DEFAULT]? " REPLY
 	test -z "$REPLY" && REPLY="$DEFAULT"
 	echo
 	if test "$REPLY" -ge 0 -a "$REPLY" -lt 1440 2> /dev/null; then

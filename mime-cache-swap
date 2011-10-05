@@ -1,0 +1,22 @@
+#! /bin/sh
+set -e
+exec >& 2
+trap "echo 'Failed!'" 0
+cd /usr/share/mime
+if test -e mime.cache.previous
+then
+	if cmp mime.cache mime.cache.previous
+	then
+		echo "Restoring original MIME cache..."
+		rm mime.cache
+		mv mime.cache.previous mime.cache
+	else
+		echo "Sorry, MIME cache has been updated..."
+		echo "Keeping new cache, deleting saved backup."
+		rm mime.cache.previous
+	fi
+else
+	echo "Saving original MIME cache..."
+	cp mime.cache mime.cache.previous
+fi
+trap - 0

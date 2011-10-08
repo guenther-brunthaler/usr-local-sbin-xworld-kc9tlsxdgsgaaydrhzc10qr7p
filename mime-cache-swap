@@ -17,6 +17,7 @@ then
 	fi
 else
 	echo "Saving original MIME cache..."
-	cp mime.cache mime.cache.previous
+	mv mime.cache mime.cache.previous
+	cp mime.cache.previous mime.cache
 fi
 trap - 0

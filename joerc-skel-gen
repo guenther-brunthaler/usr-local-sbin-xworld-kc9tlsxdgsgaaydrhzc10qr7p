@@ -2,6 +2,7 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
+# Version 12.122
 # Written by Guenther Brunthaler.
 
 
@@ -77,11 +78,12 @@ my $USER_nowrap= '--wordwrap';
 my $USER_pnowrap= << "." . $USER_prog;
    $USER_nowrap
 .
-my $USER_SIMPLICITY= << "." . $USER_prog_x;
+my $USER_SIMPLICITY= << "." . $USER_prog2_x;
    \40
     Simplicity source file
    *
    +#!\\+\\[ \t]\\+\\[a-z/]/env simple\\>
+   +#!\\+\\[ \t]\\+\\[a-z/]/env sim\\>
 .
 my $USER_VALA= << "." . $USER_autoprog_x
    \40

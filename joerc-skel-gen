@@ -2,7 +2,7 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 12.122
+# Version 12.251
 # Written by Guenther Brunthaler.
 
 
@@ -87,11 +87,14 @@ my $USER_SIMPLICITY= << "." . $USER_prog2_x;
 .
 my $USER_VALA= << "." . $USER_autoprog_x
    \40
-    Vala source file
+    Vala/Genie source file
    *.gir
 .
 . << "." . $USER_autoprog_x
    *.vala
+.
+. << "." . $USER_autoprog_x
+   *.gs
 .
 . << "." . $USER_autoprog_x . $USER_SIMPLICITY;
    *.vapi

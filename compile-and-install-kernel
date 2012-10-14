@@ -18,7 +18,7 @@ SKIPTO=`printf '%s' "$1" | tr -dc '[:digit:]'`
 SKIPTO=${SKIPTO:-1}
 if test $SKIPTO = 1; then
 	echo "*** PHASE 1 ***"
-	make `. /etc/make.conf && printf '%s\n' "$MAKEOPTS"` 2>& 1 > msgs \
+	make `. /etc/portage/make.conf && printf '%s\n' "$MAKEOPTS"` 2>& 1 > msgs \
 		| tee failures
 else
 	echo "Skipping to PHASE $SKIPTO..."

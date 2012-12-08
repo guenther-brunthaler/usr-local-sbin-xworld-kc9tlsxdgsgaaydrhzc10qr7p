@@ -1,0 +1,126 @@
+#! /bin/sh
+# Option -d shuts down the gateway rather than enable it.
+#
+# If any arguments (besides options) are specified, then
+# the gateway is restricted to forwarding from those interfaces
+# (they need not actually exist).
+#
+# By default, all interfaces with routes except that with the
+# default route will be enabled as forwarding source networks.
+#
+# (c) 2012 by Guenther Brunthaler.
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+
+ROUTE=route
+IFCONFIG=ifconfig
+
+set -e
+
+TF=
+rmtf() {
+	rm "$TF"
+	TF=
+}
+
+OK=
+cleanup() {
+	test -n "$TF" && rmtf
+	test -z "$OK" && echo "Failed!" >& 2
+}
+trap cleanup 0
+
+case $1 in
+	--disable | -d)
+		shift; enable=0
+		;;
+	*)
+		enable=1
+esac
+
+TF=`tempfile`
+LC_ALL=C "$ROUTE" -n 2> /dev/null | awk '
+	$1 == "0.0.0.0" {
+		# Use this as gateway IF.
+		gw= $NF; print "@" gw
+	}
+	$1 ~ /^[0-9]*[.]/ && $NF != gw {
+		# Use this as forwarding source IF.
+		print $1 "/" $3 "@" $NF
+	}
+' > "$TF"
+
+splitLINE() {
+	IF=${LINE#*"@"}; FILTER=${LINE%"@"*}
+}
+
+# Forwarding target interface.
+INTERNET_IF=
+# String of items (format 192.168.0/24@eth0) to be used as forwarding sources.
+IFNMS=
+while IFS= read -r LINE
+do
+	splitLINE
+	if test -z "$FILTER"
+	then
+		INTERNET_IF=$IF
+	else
+		allowed=y
+		if test $# -gt 0
+		then
+			allowed=
+			for enabled
+			do
+				if test x"$enabled" = x"$IF"
+				then
+					allowed=y
+					break
+				fi
+			done
+		fi
+		test -n "$allowed" && IFNMS=$IFNMS${IFNMS:+ }$LINE
+	fi
+done < "$TF"
+rmtf
+test -n "$INTERNET_IF"
+
+iptables -P FORWARD DROP
+iptables -F FORWARD
+if test $enable = 1
+then
+	for LINE in $IFNMS
+	do
+		splitLINE
+		echo "Forwarding from $IF matching addr/mask $FILTER" \
+			"via $INTERNET_IF." >& 2
+		iptables -A FORWARD -o "$INTERNET_IF" -i "$IF" -s "$FILTER" \
+			-m conntrack --ctstate NEW -j ACCEPT
+	done
+	iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED \
+		-j ACCEPT
+fi
+iptables -t nat -F POSTROUTING
+if test $enable = 1
+then
+	iptables -t nat -A POSTROUTING -j MASQUERADE
+fi
+for LINE in $IFNMS
+do
+	splitLINE
+	if test $enable = 0
+	then
+		echo "Disabling forwarding from interface $IF." >& 2
+	fi
+	sysctl -q -w net.ipv4.conf."$IF".forwarding=$enable
+done
+what=Disabling; test $enable = 1 && what=Enabling
+echo "$what interface $INTERNET_IF as forwarding target." >& 2
+sysctl -q -w net.ipv4.conf."$INTERNET_IF".forwarding=$enable
+echo >& 2
+if test $enable = 1
+then
+	echo 'run @ client: $ route add default gw $GATEWAY' >& 2
+else
+	echo 'run @ client: $ route del default' >& 2
+fi
+OK=Y

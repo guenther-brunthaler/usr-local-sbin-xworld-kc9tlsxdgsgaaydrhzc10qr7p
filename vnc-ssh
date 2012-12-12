@@ -1,0 +1,14 @@
+#! /bin/sh
+# Accept any number of connections (in sequence) via SSH on $PORT.
+
+PORT=5900
+#
+set -- `ps -A -o cmd | grep ^/usr/bin/X `
+DISP=$2
+while test x"$1" != x"-auth"
+do
+	test -n "$1" || exit
+	shift
+done
+AUTH=$2
+x11vnc -display "$DISP" -listen localhost -autoport "$PORT" -auth "$AUTH" -forever

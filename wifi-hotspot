@@ -1,0 +1,32 @@
+#! /bin/sh
+# Setup or shutdown a Wi-Fi hotspot (for Internet connection sharing).
+#
+# (c) 2012 by Guenther Brunthaler.
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+case $1 in
+	--disable | -d)
+		echo "Disabling WLAN hotspot..."
+		gateway_setup -d
+		/etc/init.d/hostapd stop
+		rfkill block wifi
+		gateway_setup
+		/etc/init.d/dnsmasq restart
+	;;
+	--enable | -e)
+		echo "Enabling WLAN hotspot..."
+		gateway_setup -d
+		rfkill unblock wifi
+		sleep 2
+		ifdown wlan0
+		sleep 2
+		/etc/init.d/hostapd start
+		sleep 1
+		gateway_setup
+		/etc/init.d/dnsmasq restart
+	;;
+	*)
+		A=${0##*/}
+		echo "$A -e | --enable: enable Wi-Fi hotspot"
+		echo "$A -d | --disable: disable Wi-Fi hotspot"
+esac

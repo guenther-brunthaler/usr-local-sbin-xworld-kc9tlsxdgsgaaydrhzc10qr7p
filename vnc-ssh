@@ -3,12 +3,31 @@
 
 PORT=5900
 #
-set -- `ps -A -o cmd | grep ^/usr/bin/X `
-DISP=$2
-while test x"$1" != x"-auth"
+DRY_RUN=
+while getopts n OPT
 do
-	test -n "$1" || exit
+	case $OPT in
+		n) DRY_RUN=Y;;
+		*) false; exit
+	esac
+done
+set -- `ps -A -o cmd | grep ^/usr/bin/X `
+AUTH=
+DISP=
+while test $# != 0
+do
+	case $1 in
+		*-auth) AUTH=$2;;
+		:[0-9]*) DISP=$1
+	esac
 	shift
 done
-AUTH=$2
-x11vnc -display "$DISP" -listen localhost -autoport "$PORT" -auth "$AUTH" -forever
+set -- x11vnc -display "$DISP" -listen localhost -autoport "$PORT"
+test -n "$AUTH" && set -- "$@" -auth "$AUTH"
+set -- "$@" -forever
+if test -n "$DRY_RUN"
+then
+	echo "SIMULATION: $*"
+	exit
+fi
+exec "$@"

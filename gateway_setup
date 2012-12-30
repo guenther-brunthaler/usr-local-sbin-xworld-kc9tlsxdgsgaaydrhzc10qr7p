@@ -84,7 +84,12 @@ done < "$TF"
 rmtf
 test -n "$INTERNET_IF"
 
-iptables -P FORWARD DROP
+if test $enable = 1
+then
+	iptables -P FORWARD DROP
+else
+	iptables -P FORWARD ACCEPT
+fi
 iptables -F FORWARD
 if test $enable = 1
 then
@@ -102,7 +107,7 @@ fi
 iptables -t nat -F POSTROUTING
 if test $enable = 1
 then
-	iptables -t nat -A POSTROUTING -j MASQUERADE
+	iptables -t nat -A POSTROUTING -o "$INTERNET_IF" -j MASQUERADE
 fi
 for LINE in $IFNMS
 do

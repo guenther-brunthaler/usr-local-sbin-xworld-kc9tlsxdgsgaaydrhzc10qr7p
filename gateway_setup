@@ -26,7 +26,11 @@ rmtf() {
 OK=
 cleanup() {
 	test -n "$TF" && rmtf
-	test -z "$OK" && echo "Failed!" >& 2
+	if test -z "$OK"
+	then
+		echo "Failed!" >& 2
+		false
+	fi
 }
 trap cleanup 0
 

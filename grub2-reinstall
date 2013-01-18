@@ -1,0 +1,72 @@
+#! /bin/sh
+
+# Where to find settings.
+SETTINGS_FILE=/etc/default/grub
+
+# UUID of the partition where to install GRUB to. Can be prefixed by
+# "parent_of:", in which case the disk containing that partition will be used
+# instead as the installation device.
+GRUB_INSTALL_DEVICE_UUID= # Actual value will be sourced from "$SETTINGS_FILE".
+
+
+run() {
+	"$@" && return
+	echo "ERROR: Command >>>$*<<< failed with return code ${?}!" >& 2
+	false; exit
+}
+
+
+print_device() {
+	(
+		. "$SETTINGS_FILE"
+		printf '%s\n' "$GRUB_INSTALL_DEVICE_UUID"
+	)
+}
+
+
+DRY_RUN=
+RECHECK=
+while getopts nr OPT
+do
+	case $OPT in
+		n) DRY_RUN=Y;;
+		r) RECHECK=Y;;
+		*) false; exit
+	esac
+done
+shift `expr $OPTIND - 1`
+run test $# = 0
+run test -f "$SETTINGS_FILE"
+GRUB_INSTALL_DEVICE_UUID=`print_device`
+run test -n "$GRUB_INSTALL_DEVICE_UUID"
+use_parent=${GRUB_INSTALL_DEVICE_UUID#parent_of:}
+set -- "Installation device is"
+if test x"$use_parent" != x"$GRUB_INSTALL_DEVICE_UUID"
+then
+	GRUB_INSTALL_DEVICE_UUID=$use_parent
+	set -- "$@" "disk containing"
+else
+	use_parent=
+fi
+echo "$* partition with UUID $GRUB_INSTALL_DEVICE_UUID."
+dev=`run blkid -U "$GRUB_INSTALL_DEVICE_UUID"` || exit
+if test -n "$use_parent"
+then
+	use_parent=${dev%%[0-9]}
+	test x"$use_parent" != x"$dev"
+	dev=$use_parent
+fi
+run test -b "$dev"
+GRUB_BIN=`which grub2-install 2> /dev/null` \
+|| GRUB_BIN=`run which grub-install 2> /dev/null` || exit
+echo "Installing GRUB boot sector into $dev..."
+if test -n "$DRY_RUN"
+then
+	set -- echo "SIMULATION:"
+else
+	set --
+fi
+set -- run "$@" "$GRUB_BIN" --no-floppy
+test -z "$use_parent" && set -- "$@" --force
+test -n "$RECHECK" && set -- "$@" --recheck
+"$@" "$dev"

@@ -1,12 +1,73 @@
 #! /bin/sh
+show_version() {
+	wr <<- .
+	$APP version 13.18
+
+	(c) 2013 by Guenther Brunthaler.\n
+	Distribution is permitted under the terms of the GPLv3.
+.
+}
+APP=${0##*/}
+
 
 # Where to find settings.
 SETTINGS_FILE=/etc/default/grub
+
+# How to refer to grub in messages.
+GRUBNAME=GRUB2
+
+# How to refer to /boot/grub/grub.cfg in messages.
+GRUBCFG_NAME=grub.cfg
 
 # UUID of the partition where to install GRUB to. Can be prefixed by
 # "parent_of:", in which case the disk containing that partition will be used
 # instead as the installation device.
 GRUB_INSTALL_DEVICE_UUID= # Actual value will be sourced from "$SETTINGS_FILE".
+
+
+show_help() {
+	wr <<- .
+	$APP - reinstall $GRUBNAME boot loader
+	
+	Usage: $APP [ options ]
+	
+	$APP reinstalls the $GRUBNAME executables and refreshes the block
+	lists if necessary.
+	
+	It is not necessary to call $APP if just the $GRUBNAME $GRUBCFG_NAME
+	file has changed.
+	
+	But $APP should always be called after the $GRUBNAME installation
+	package has been updated, or ig the boot device/partition has changed.
+	
+	$APP reads the setting GRUB_INSTALL_DEVICE_UUID from the file
+	"$SETTINGS_FILE" in order to determine where to install $GRUBNAME to.
+	
+	The value of this setting can be a UUID in lower case, just as it will
+	be displayed by executing
+	
+	\$ blkid -o value -s UUID /dev/<partition>
+	
+	Optionally, this value can be prefixed by the string "parent_of:".
+	
+	In this case, the disk containing the specified partition will be used
+	as the installation device, rather than the partition with the
+	specified UUID itself.
+	
+	Options:
+
+	-n:\n
+	    Dry run. Show the installation command which would be executed,
+	    but don't actually do anything.\n
+	-r:\n
+	    Re-check the partition layout and drive numbering and discard any
+	    cached information from previous runs about this.\n
+	-h: Show this help.\n
+	-V: Show only the version information.\n
+.
+	println
+	show_version
+}
 
 
 run() {
@@ -16,21 +77,46 @@ run() {
 }
 
 
+println() {
+	run printf '%s\n' "$*"
+}
+
+
+wr() {
+	local REPLY
+	while IFS= read -r REPLY
+	do
+		{
+			while test -n "$REPLY" || IFS= read -r REPLY
+			do
+				ORIG=$REPLY; REPLY=${REPLY%\\n}
+				println "$REPLY"
+				test x"$ORIG" != x"$REPLY"  && break
+				REPLY=
+			done
+		} | run fmt -w "$LINEWIDTH" || exit
+	done
+}
+LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
+
+
 print_device() {
 	(
 		. "$SETTINGS_FILE"
-		printf '%s\n' "$GRUB_INSTALL_DEVICE_UUID"
+		println "$GRUB_INSTALL_DEVICE_UUID"
 	)
 }
 
 
 DRY_RUN=
 RECHECK=
-while getopts nr OPT
+while getopts nrhV OPT
 do
 	case $OPT in
 		n) DRY_RUN=Y;;
 		r) RECHECK=Y;;
+		h) show_help; exit;;
+		V) show_version; exit;;
 		*) false; exit
 	esac
 done
@@ -59,7 +145,7 @@ fi
 run test -b "$dev"
 GRUB_BIN=`which grub2-install 2> /dev/null` \
 || GRUB_BIN=`run which grub-install 2> /dev/null` || exit
-echo "Installing GRUB boot sector into $dev..."
+echo "Installing $GRUBNAME boot sector into $dev..."
 if test -n "$DRY_RUN"
 then
 	set -- echo "SIMULATION:"

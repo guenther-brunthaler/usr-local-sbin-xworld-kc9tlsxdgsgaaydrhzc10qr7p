@@ -1,7 +1,7 @@
 #! /bin/sh
 show_version() {
 	wr <<- .
-	$APP version 13.18
+	$APP version 13.19
 
 	(c) 2013 by Guenther Brunthaler.\n
 	Distribution is permitted under the terms of the GPLv3.
@@ -21,8 +21,21 @@ GRUBCFG_NAME=grub.cfg
 
 # UUID of the partition where to install GRUB to. Can be prefixed by
 # "parent_of:", in which case the disk containing that partition will be used
-# instead as the installation device.
-GRUB_INSTALL_DEVICE_UUID= # Actual value will be sourced from "$SETTINGS_FILE".
+# instead as the installation device. Actual value will be sourced from
+# "$SETTINGS_FILE".
+GRUB_INSTALL_DEVICE_UUID=
+
+# Location of the mount point where the volume with the GRUB runtime binaries
+# will be written to. Actual value can be overridden in "$SETTINGS_FILE".
+# WARNING: It seems GRUB has a bug and fails if the string length of this
+# setting becomes too long. In this case it might be better to stick to the
+# default (/boot). Note that it is not necessary to create an fstab entry for
+# /boot, as long as the filesystem can be detected automatically by "mount"
+# when device and mount point are specified. The script will then try to mount
+# the filesystem manually. Note however that this does not work with reiserfs
+# when using block lists, because in this case tail packing would need to be
+# disabled by using a mount option.
+GRUB_RUNTIME_BINARIES_INSTALLATION_TARGET_MOUNTPOINT=/boot
 
 
 show_help() {
@@ -63,7 +76,33 @@ show_help() {
 	    Re-check the partition layout and drive numbering and discard any
 	    cached information from previous runs about this.\n
 	-h: Show this help.\n
-	-V: Show only the version information.\n
+	-V: Show only the version information.
+	
+	Some advice on using this script.
+	
+	The $GRUBNAME installation framework is very unreliable because it is
+	based on shell scripts which become easily confused by special
+	characters due to improper internal quoting, and provide poor error
+	handling capabilties.
+	
+	Also, the $GRUBNAME framework is quite buggy. For instance, there seem
+	to be hardcoded limits to the string lengths of various arguments, but
+	those limits are not documented anywhere. There are also no clear
+	error messages in such cases; the utility just segfaults.
+	
+	Therefore, in case of segfaults, consider shortening path names or
+	reverting to default settings in order to find out what tiggers the
+	problem.
+	
+	Also, use the "-r" option if blocklist-based installation fails. It
+	sometimes it necessary to use -r for no apparent reason.
+	
+	If blocklist-base installation still fails, running fsck often helps
+	before trying again.
+	
+	Note that $APP ist just a wrapper script around the $GRUBNAME
+	installation framework scripts; the author of $APP is not responsible
+	for the framework's limitations.
 .
 	println
 	show_version
@@ -100,11 +139,62 @@ wr() {
 LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
 
 
-print_device() {
+setting() {
 	(
+		n9f7zqed7g23uvbiu4sv55mml=$1
 		. "$SETTINGS_FILE"
-		println "$GRUB_INSTALL_DEVICE_UUID"
+		eval "println \"\$$n9f7zqed7g23uvbiu4sv55mml\""
 	)
+}
+
+
+fs_id() {
+	# It does not suffice to just check the device number of the
+	# directory, because in btrfs subvolumes share the same device number
+	# as their parent volume.
+	LC_ALL=C run stat -L -f -c '%i:%T:%b' "$1"
+}
+
+
+cleanup() {
+	RC=$?
+	if test -n "$unmount_at_end"
+	then
+		echo "Unmounting filesystem at '$MOUNTPOINT'."
+		set -- umount -- "$MOUNTPOINT"
+		if test -n "$DRY_RUN"
+		then
+			set -- echo "SIMULATION: $*"
+		fi
+		"$@"
+	fi
+	test $RC = 0
+}
+
+
+# Is $1 a mount point which is currently mounted?
+is_mounted() {
+	local child parent
+	run test -d "$1"
+	child=`readlink -f "$1"`
+	test x"$child" = x"/" && return
+	parent=`dirname "$child"`
+	run test -d "$parent"
+	parent=`readlink -f "$parent"`
+	test x"$child" != x"$parent" || return
+	child=`fs_id "$child"`
+	parent=`fs_id "$parent"`
+	test x"$child" != x"$parent"
+}
+
+
+try_mount() {
+	mount -- "$@" > /dev/null 2>& 1 || return
+	case $# in
+		1) echo "Mounted '$1'.";;
+		2) echo "Mounted '$1' on '$2'.";;
+		*) false; exit
+	esac
 }
 
 
@@ -122,8 +212,12 @@ do
 done
 shift `expr $OPTIND - 1`
 run test $# = 0
+# Prepare cleanup
+unmount_at_end=
+trap cleanup 0
+# Determine installation device and whether it is a partition.
 run test -f "$SETTINGS_FILE"
-GRUB_INSTALL_DEVICE_UUID=`print_device`
+GRUB_INSTALL_DEVICE_UUID=`setting GRUB_INSTALL_DEVICE_UUID`
 run test -n "$GRUB_INSTALL_DEVICE_UUID"
 use_parent=${GRUB_INSTALL_DEVICE_UUID#parent_of:}
 set -- "Installation device is"
@@ -143,6 +237,48 @@ then
 	dev=$use_parent
 fi
 run test -b "$dev"
+# Determine installation target mount point.
+MOUNTPOINT=`setting GRUB_RUNTIME_BINARIES_INSTALLATION_TARGET_MOUNTPOINT`
+if test -z "$MOUNTPOINT"
+then
+	MOUNTPOINT=$GRUB_RUNTIME_BINARIES_INSTALLATION_TARGET_MOUNTPOINT
+fi
+run test x"${MOUNTPOINT#/}" != x"$MOUNTPOINT" # Must be an absolute path.
+# Mount temporarily unless already mounted.
+action=
+for st in `seq 4`
+do
+	if is_mounted "$MOUNTPOINT"
+	then
+		unmount_at_end=$action
+		break
+	fi
+	action=Y
+	case $st in
+		1)
+			if test -n "$DRY_RUN"
+			then
+				echo "SIMULATION: Mounting file system" \
+				"on mount point '$MOUNTPOINT'."
+				unmount_at_end=$action
+				break
+			else
+				try_mount "$MOUNTPOINT"
+			fi
+			;;
+		2)
+			m=`readlink -f "$MOUNTPOINT"`
+			try_mount "$m" && MOUNTPOINT=$m
+			;;
+		3) try_mount "$dev" "$MOUNTPOINT";;
+		4)
+			m=`readlink -f "$MOUNTPOINT"`
+			try_mount "$dev" "$m" && MOUNTPOINT=$m
+			;;
+		*) false; exit
+	esac
+done
+# Construct command line.
 GRUB_BIN=`which grub2-install 2> /dev/null` \
 || GRUB_BIN=`run which grub-install 2> /dev/null` || exit
 echo "Installing $GRUBNAME boot sector into $dev..."
@@ -155,4 +291,10 @@ fi
 set -- run "$@" "$GRUB_BIN" --no-floppy
 test -z "$use_parent" && set -- "$@" --force
 test -n "$RECHECK" && set -- "$@" --recheck
+if
+	test x"$GRUB_RUNTIME_BINARIES_INSTALLATION_TARGET_MOUNTPOINT" \
+	!= x"$MOUNTPOINT"
+then
+	set -- "$@" --boot-directory="$MOUNTPOINT"
+fi
 "$@" "$dev"

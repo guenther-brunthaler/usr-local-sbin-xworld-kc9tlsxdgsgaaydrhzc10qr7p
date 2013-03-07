@@ -1,7 +1,7 @@
 #! /bin/sh
 show_version() {
 	wr <<- .
-	$APP version 13.62
+	$APP version 13.66
 
 	(c) 2008-2013 by Guenther Brunthaler.\n
 	Distribution is permitted under the terms of the GPLv3.
@@ -16,20 +16,24 @@ show_help() {
 	
 	Usage: $APP [ options ]
 
-	Run $APP from the directory containing the directory tree which
-	which shall become the root-directory of your root jail (or initrd) at
-	some later time.
+	Run $APP from the directory containing the directory tree which which
+	shall become the root-directory of your root jail (or initrd) at some
+	later time.
 
 	$APP will first remove any old contents of ./lib in order to avoid
 	keeping around outdated dependencies, except for a subdirectory
-	"./lib/dlopen" if it exists.
+	"./lib/dlopen" (if it exists).
 	
-	Next it will hard-link any files in subdirectory "./lib/dopen/*",
-	if it exists, into directory ./lib/.
+	Next it will hard-link any files in subdirectory "./lib/dopen/*", if
+	it exists, into directory ./lib/.
 	
 	It will then recursively scan all executables in the directory tree
 	for required shared library dependencies, and will copy all those
-	libraries from your real filesystem into ./lib.
+	dependencies from your real filesystem into ./lib.
+	
+	Libraries loaded dynamically at run-time via dl_open cannot be
+	detected by this process; put those libraries into "./lib/dlopen/"
+	manually in order to automatically add them as enforced dependencies.
 	
 	Next, any libraries required by the newly copied libraries themselves
 	will be copied in the same way, and so on, until all dependencies have
@@ -139,8 +143,8 @@ read -p "Press Enter to continue or Ctrl-C to abort. " DUMMY
 echo
 system pwd; PWD=$REPLY
 run test -d lib && run test "x$PWD" != x/
-find lib -path lib/dlopen -prune -o -name '*.so*' -type f -exec rm "{}" \;
-find lib -path 'lib/dlopen/*.so*' -type f -exec ln "{}" lib/ \;
+find lib -path lib/dlopen -prune -o -name '*.so*' -type f -exec rm -- "{}" \;
+find lib -path 'lib/dlopen/*.so*' -type f -exec ln -- "{}" lib/ \;
 tfile NAMES
 wrout "Collecting executables in '$PWD'-subtree..."
 run find -xdev -type f -executable > $NAMES
@@ -150,7 +154,8 @@ run file -f $NAMES > $FILED
 run test x"`wc -l $NAMES | cut -d' ' -f1`" = x"`wc -l $FILED | cut -d' ' -f1`"
 tfile CANDIDATES
 wrout "Determining referenced shared libraries..."
-run paste -d: $NAMES $FILED | run grep ELF | run grep executable \
+run paste -d: $NAMES $FILED | run grep ELF \
+	| run grep 'executable\|shared object' \
 	| run cut -d: -f1 | run sort -u \
 	| while IFS= read -r FILE; do
 		ldd "$FILE" 2> /dev/null

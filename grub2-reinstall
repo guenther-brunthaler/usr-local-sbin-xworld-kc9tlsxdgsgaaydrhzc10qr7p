@@ -1,9 +1,9 @@
 #! /bin/sh
 show_version() {
-	wr <<- .
-	$APP version 13.19
+	wr -s <<- .
+	$APP version 13.130
 
-	(c) 2013 by Guenther Brunthaler.\n
+	(c) 2013 by Guenther Brunthaler.
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
@@ -51,7 +51,7 @@ show_help() {
 	file has changed.
 	
 	But $APP should always be called after the $GRUBNAME installation
-	package has been updated, or ig the boot device/partition has changed.
+	package has been updated, or if the boot device/partition has changed.
 	
 	$APP reads the setting GRUB_INSTALL_DEVICE_UUID from the file
 	"$SETTINGS_FILE" in order to determine where to install $GRUBNAME to.
@@ -69,15 +69,16 @@ show_help() {
 	
 	Options:
 
-	-n:\n
-	    Dry run. Show the installation command which would be executed,
-	    but don't actually do anything.\n
-	-r:\n
-	    Re-check the partition layout and drive numbering and discard any
-	    cached information from previous runs about this.\n
-	-h: Show this help.\n
+	-n: Dry run. Show the installation command which would be executed,
+	    but don't actually do anything.
+
+	-r: Re-check the partition layout and drive numbering and discard any
+	    cached information from previous runs about this.
+
+	-h: Show this help.
+
 	-V: Show only the version information.
-	
+
 	Some advice on using this script.
 	
 	The $GRUBNAME installation framework is very unreliable because it is
@@ -97,14 +98,15 @@ show_help() {
 	Also, use the "-r" option if blocklist-based installation fails. It
 	sometimes it necessary to use -r for no apparent reason.
 	
-	If blocklist-base installation still fails, running fsck often helps
-	before trying again.
+	If blocklist-base installation still fails, running fsck on the
+	partition where to install $GRUBNAME to often helps before trying
+	again.
 	
 	Note that $APP ist just a wrapper script around the $GRUBNAME
 	installation framework scripts; the author of $APP is not responsible
 	for the framework's limitations.
+
 .
-	println
 	show_version
 }
 
@@ -116,25 +118,9 @@ run() {
 }
 
 
-println() {
-	run printf '%s\n' "$*"
-}
-
-
 wr() {
-	local REPLY
-	while IFS= read -r REPLY
-	do
-		{
-			while test -n "$REPLY" || IFS= read -r REPLY
-			do
-				ORIG=$REPLY; REPLY=${REPLY%\\n}
-				println "$REPLY"
-				test x"$ORIG" != x"$REPLY"  && break
-				REPLY=
-			done
-		} | run fmt -w "$LINEWIDTH" || exit
-	done
+	test -z "$*" && set -- -c
+	fmt -w "$LINEWIDTH" "$@"
 }
 LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
 
@@ -143,7 +129,7 @@ setting() {
 	(
 		n9f7zqed7g23uvbiu4sv55mml=$1
 		. "$SETTINGS_FILE"
-		eval "println \"\$$n9f7zqed7g23uvbiu4sv55mml\""
+		eval "printf '%s\n' \"\$$n9f7zqed7g23uvbiu4sv55mml\""
 	)
 }
 
@@ -232,7 +218,13 @@ echo "$* partition with UUID $GRUB_INSTALL_DEVICE_UUID."
 dev=`run blkid -U "$GRUB_INSTALL_DEVICE_UUID"` || exit
 if test -n "$use_parent"
 then
-	use_parent=${dev%%[0-9]}
+	use_parent=$dev
+	while
+		use_parent2=${use_parent%[0-9]}
+		test x"$use_parent2" != x"$use_parent"
+	do
+		use_parent=$use_parent2
+	done
 	test x"$use_parent" != x"$dev"
 	dev=$use_parent
 fi

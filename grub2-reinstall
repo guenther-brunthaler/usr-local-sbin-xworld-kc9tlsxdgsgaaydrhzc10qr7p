@@ -1,7 +1,7 @@
 #! /bin/sh
 show_version() {
 	wr -s <<- .
-	$APP version 13.130
+	$APP version 13.170
 
 	(c) 2013 by Guenther Brunthaler.
 	Distribution is permitted under the terms of the GPLv3.
@@ -67,6 +67,13 @@ show_help() {
 	as the installation device, rather than the partition with the
 	specified UUID itself.
 	
+	Under Debian only (but this includes all Debian-derived Linux
+	distributions like Ubuntu as well), setting GRUB_INSTALL_DEVICE_UUID
+	is optional. If set, it will be checked to match the device specified
+	in the Debian configuration. If unset, the Debian configuration
+	settings will be used in order to determine the device and sector
+	where to install the $GRUBNAME first-stage boot loader.
+	
 	Options:
 
 	-n: Dry run. Show the installation command which would be executed,
@@ -111,10 +118,29 @@ show_help() {
 }
 
 
+die() {
+	echo "ERROR: $*" >& 2
+	false; exit
+}
+
+
 run() {
 	"$@" && return
-	echo "ERROR: Command >>>$*<<< failed with return code ${?}!" >& 2
-	false; exit
+	die "Command >>>$*<<< failed with return code ${?}!"
+}
+
+
+have() {
+	local v_6x4aqe3vdwgqqlclu76d0w2jn
+	if v_6x4aqe3vdwgqqlclu76d0w2jn=`which "$1" 2> /dev/null`
+	then
+	
+		eval "$2=\$v_6x4aqe3vdwgqqlclu76d0w2jn"
+		test -n "$v_6x4aqe3vdwgqqlclu76d0w2jn"
+	else
+		eval "$2="
+		false
+	fi
 }
 
 
@@ -184,6 +210,52 @@ try_mount() {
 }
 
 
+# Set $INSTALL_DEV to configured device or an empty string.
+# Resolves any symlinks in the device path name.
+# Checks that the device exists.
+get_configured_install_device() {
+	local result
+	INSTALL_DEV=
+	if test -n "$DEBCONF"
+	then
+		local pkgname key
+		pkgname=grub-pc
+		key=install_devices
+		result=`
+			"$DEBCONF" "$pkgname" \
+			| grep "^[*] $pkgname/$key: " \
+			| cut -d : -f2- | cut -d " " -f2-
+		` || return
+		# This script only supports a single install device.
+		test -n "$result" && test -e "$result" || return
+		result=`readlink -f -- "$result"` || return
+		test -n "$result" && test -b "$result" || return
+		INSTALL_DEV=$result
+		return
+	fi
+}
+
+
+try_get_instdev_elsewhere() {
+	local INSTALL_DEV
+	get_configured_install_device
+	test -n "$INSTALL_DEV" || return
+	GRUB_INSTALL_DEVICE_UUID=`"$BLKID" -o value -s UUID "$INSTALL_DEV"`
+	run test -n "$GRUB_INSTALL_DEVICE_UUID"
+}
+
+
+verify_matching_xtrn_config() {
+	local INSTALL_DEV uuid_dev
+	get_configured_install_device
+	test -n "$INSTALL_DEV" || return
+	uuid_dev=`readlink -f -- "$1"`
+	test x"$INSTALL_DEV" = x"$uuid_dev" && return
+	die "System-configured install device '$INSTALL_DEV'" \
+		"is not the same as UUID-selected install device '$1'!"
+}
+
+
 DRY_RUN=
 RECHECK=
 while getopts nrhV OPT
@@ -202,8 +274,11 @@ run test $# = 0
 unmount_at_end=
 trap cleanup 0
 # Determine installation device and whether it is a partition.
+run have blkid BLKID
 run test -f "$SETTINGS_FILE"
 GRUB_INSTALL_DEVICE_UUID=`setting GRUB_INSTALL_DEVICE_UUID`
+have debconf-show DEBCONF
+test -z  "$GRUB_INSTALL_DEVICE_UUID" && try_get_instdev_elsewhere
 run test -n "$GRUB_INSTALL_DEVICE_UUID"
 use_parent=${GRUB_INSTALL_DEVICE_UUID#parent_of:}
 set -- "Installation device is"
@@ -229,6 +304,7 @@ then
 	dev=$use_parent
 fi
 run test -b "$dev"
+verify_matching_xtrn_config "$dev"
 # Determine installation target mount point.
 MOUNTPOINT=`setting GRUB_RUNTIME_BINARIES_INSTALLATION_TARGET_MOUNTPOINT`
 if test -z "$MOUNTPOINT"
@@ -271,8 +347,8 @@ do
 	esac
 done
 # Construct command line.
-GRUB_BIN=`which grub2-install 2> /dev/null` \
-|| GRUB_BIN=`run which grub-install 2> /dev/null` || exit
+have grub2-install GRUB_BIN \
+|| have grub-install GRUB_BIN || exit
 echo "Installing $GRUBNAME boot sector into $dev..."
 if test -n "$DRY_RUN"
 then

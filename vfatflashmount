@@ -1,12 +1,13 @@
 #! /bin/sh
 show_version() {
-	wrL <<-.
-	$APP version 10.124
+	wr -s <<-.
+	$APP version 13.174
 
-	(c) 2007 - 2010 by Guenther Brunthaler.
+	(c) 2007 - 2013 by Guenther Brunthaler.
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
+APP=${0##*/}
 
 
 show_help() {
@@ -17,34 +18,41 @@ show_help() {
 	Uses the correct options for setting umask, dmask, character set
 	translation, owner, group, etc.
 
-	Usage: vfatmount [ options ] <device> <mount_point_directory>
+	Usage:
+	  vfatmount [ options ] <device> <mount_point_directory>
 	
-	<device>: The device or image file containg the volume data of the
-	FAT16 or FAT32 file system. If it is a file rather than a block
-	special device, 'loop' will automatically be added to the default
-	options.
+	<device>:
+	  The device or image file containg the volume data of the FAT16 or
+	  FAT32 file system. If it is a file rather than a block special
+	  device, 'loop' will automatically be added to the default options.
 
 	Command line options accepted by $APP:
 
-	--dry-run, --simulate, -n: Just print what would be done, but don't
-	actually do anything.
+	--dry-run, --simulate, -n:
+	  Just print what would be done, but don't actually do anything.
 
-	--read-only, -r: Add 'ro' to the default options.
+	--read-only, -r:
+	  Add 'ro' to the default options.
 
-	--create-mountpoint, -c, -m: If the mount point directory does not yet
-	exist, it will be created using the provided path name.
+	--create-mountpoint, -c, -m:
+	  If the mount point directory does not yet exist, it will be created
+	  using the provided path name.
 
-	--options, -o <more_options>: Will be added to the list auf default
-	options. Can be used to specify additional mount options such
-	"remount" which will not be used by default.
+	--options, -o <more_options>:
+	  Will be added to the list auf default options. Can be used to
+	  specify additional mount options such "remount" which will not be
+	  used by default.
 
-	--: Stop parsing for command line options. Any arguments following
-	this option will be interpreted as normal arguments, even if they
-	start with "-" or "--".
+	--:
+	  Stop parsing for command line options. Any arguments following this
+	  option will be interpreted as normal arguments, even if they start
+	  with "-" or "--".
 
-	--help, -h, --usage: Display this help.
+	--help, -h, --usage:
+	  Display this help.
 
-	--version, -V: Show version information.
+	--version, -V:
+	  Show version information.
 
 	"Switch clustering" for short-options (single-dash options) is
 	supported. For instance, when specifying two separate options "-h" and
@@ -82,24 +90,10 @@ system() {
 
 
 wr() {
-	if
-		test $# -gt 0
-	then
-		printf '%s\n' "$*" | wr
-	else
-		fmt -w `tput cols`
-	fi
+	test -z "$*" && set -- -c
+	fmt -w "$LINEWIDTH" "$@"
 }
-
-
-wrL() {
-	local LINE
-	while
-		IFS= read -r LINE
-	do
-		printf "%s\n" "$LINE" | wr
-	done
-}
+LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
 
 
 write_to() {
@@ -132,12 +126,6 @@ when_real() {
 }
 
 
-APP=${0##*/}
-# Determine output line width.
-LINEWIDTH=
-REPLY=
-tty -s <& 1 && system tput cols
-LINEWIDTH=${REPLY:-70}
 # Start of command line processing.
 # Define presets.
 VERBOSE=
@@ -219,22 +207,28 @@ then
 	if
 		test -f "$REAL_PATH"
 	then
-		FLAG=0
+		HAVE_MOD=already
 		while
 			system cat "$REAL_PATH"
 			test x"${REPLY%${PREFER_IOSCHEDULER}*}" = x"$REPLY"
 		do
-			test $FLAG = 1 && break
+			if test $HAVE_MOD = loaded
+			then
+				when_real HAVE_MOD=
+				break
+			fi
 			inform "Trying to load i/o scheduler module" \
 				"'$IOSCHEDULER_MODULE'."
 			when_real silent modprobe "$IOSCHEDULER_MODULE"
 			when_real run sleep 1
-			FLAG=1
+			HAVE_MOD=loaded
 		done
 		if
-			system cat "$REAL_PATH"
-			test x"${REPLY%'['$PREFER_IOSCHEDULER']'*}" \
-				= x"$REPLY"
+			test -n "$HAVE_MOD" && {
+				system cat "$REAL_PATH"
+				test x"${REPLY%'['$PREFER_IOSCHEDULER']'*}" \
+					= x"$REPLY"
+			}
 		then
 			inform "Changing i/o scheduler for device to" \
 				"'$PREFER_IOSCHEDULER'."

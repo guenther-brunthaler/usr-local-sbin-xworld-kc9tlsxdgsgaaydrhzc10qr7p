@@ -1,7 +1,16 @@
 #! /bin/sh
 # Setup or shutdown a Wi-Fi hotspot (for Internet connection sharing).
+# You need a line like
 #
-# (c) 2012 by Guenther Brunthaler.
+# allow-x-wifi-hotspot wlan0 wlan1 ...
+#
+# in your /etc/network/interfaces specifying a list of WLAN interfaces which
+# shall be supported by this script. Most of the time, one would only want to
+# define a single such interface. Nevertheless, the indirection allows this
+# script to work no matter how the WLAN interface is named on a particular
+# system.
+#
+# (c) 2012 - 2013 by Guenther Brunthaler.
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
 case $1 in
@@ -18,7 +27,7 @@ case $1 in
 		gateway_setup -d
 		rfkill unblock wifi
 		sleep 2
-		ifdown wlan0
+		ifdown -a --allow x-wifi-hotspot
 		sleep 2
 		/etc/init.d/hostapd start
 		sleep 1

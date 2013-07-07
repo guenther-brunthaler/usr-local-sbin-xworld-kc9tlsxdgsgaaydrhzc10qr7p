@@ -1,0 +1,21 @@
+#! /bin/sh
+# Call it with an argument like /var/log/messages* in order to show files
+# "messages", "messages.1", "messages.2.gz" etc. from /var/log with "less",
+# temporarily unpacking the files for display as necessary. The order is so
+# that newer log files precede older ones.
+#
+# (c) 2013 by Superuser.
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+set -e
+trap 'echo "Failed!" >& 2' 0
+ls -v -- "$@" | while IFS= read -r f
+do
+	case $f in
+		*.gz) gzip -dc;;
+		*.bz2) bzip2 -dc;;
+		*.xz) xz -dc;;
+		*) cat
+	esac < "$f"
+done | less -F
+trap - 0

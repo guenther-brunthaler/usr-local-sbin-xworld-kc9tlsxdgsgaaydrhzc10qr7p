@@ -1,9 +1,9 @@
 #! /bin/sh
 show_version() {
 	wr <<- .
-	$APP version 13.66
+	$APP version 14.18
 
-	(c) 2008-2013 by Guenther Brunthaler.\n
+	(c) 2008-2014 by Guenther Brunthaler.\n
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
@@ -25,7 +25,9 @@ show_help() {
 	"./lib/dlopen" (if it exists).
 	
 	Next it will hard-link any files in subdirectory "./lib/dopen/*", if
-	it exists, into directory ./lib/.
+	it exists, into directory ./lib/. (If those files are symlinks instead
+	of real files, the symlinks will be resolved fully, and only the real
+	files to which the symlinks rerer will actually be copied.)
 	
 	It will then recursively scan all executables in the directory tree
 	for required shared library dependencies, and will copy all those
@@ -144,7 +146,11 @@ echo
 system pwd; PWD=$REPLY
 run test -d lib && run test "x$PWD" != x/
 find lib -path lib/dlopen -prune -o -name '*.so*' -type f -exec rm -- "{}" \;
-find lib -path 'lib/dlopen/*.so*' -type f -exec ln -- "{}" lib/ \;
+find lib -path 'lib/dlopen/*.so*' -type f | while IFS= read -r REPLY
+do
+	system readlink -f -- "$REPLY"
+	run ln -- "$REPLY" lib/
+done
 tfile NAMES
 wrout "Collecting executables in '$PWD'-subtree..."
 run find -xdev -type f -executable > $NAMES

@@ -1,9 +1,9 @@
 #! /bin/sh
 show_version() {
 	wr . <<-.
-	$APP version 12.288
+	$APP version 14.43
 
-	(c) 2009 - 2012 by Guenther Brunthaler.
+	(c) 2009 - 2014 by Guenther Brunthaler.
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
@@ -57,7 +57,7 @@ show_help() {
 	-N <integer>, --device-number <integer>, --mapping-number <integer>:
 	Specifies the number TrueCrypt shall use in the name of the mapping
 	file. If omitted, an unassigned number is picked at random from the
-	numerical range 1 to 9999 with preference of the range 1 to 99.
+	numerical range 1 to 64.
 
 	-M <string>, --mount-options <string>: Allows additional mount options
 	to be passed through to 'mount' when mounting the virtual decrypted
@@ -129,8 +129,10 @@ show_help() {
 	directory, but have a file extension ".psw" instead of ".key".
 	
 	Either a password file, a key file, or both must be present.
+
+	BUGS: $APP currently does not support hidden volumes.	
 	
-	
+
 .
 	show_version
 }
@@ -202,9 +204,9 @@ find_file() {
 
 
 find_tc_slots() {
-	"$TC_BIN" -l 2> /dev/null | sed -e '
-		/truecrypt4_[0-9]/ {
-			s/[^ ]*truecrypt4_\([0-9]*\).*/\1/
+	"$TC_BIN" -t -l 2> /dev/null | sed -e '
+		/truecrypt[0-9]/ {
+			s/[^ ]*truecrypt\([0-9]*\).*/\1/
 			p
 		}
 		d
@@ -213,20 +215,18 @@ find_tc_slots() {
 
 
 find_free_tc_slot() {
-	"$TC_BIN" -l 2> /dev/null | awk '
+	"$TC_BIN" -t -l 2> /dev/null | awk '
 		{
-			if (match($1, "truecrypt4_([0-9]*)", m)) s[m[1]]= 1
+			if (match($1, "truecrypt([0-9]*)", m)) s[m[1]]= 1
 		}
 		END {
 			srand()
-			for (dim= 100; dim < 10000; dim*= 10) {
-				b= int(rand() * (dim - 1)) + 1
-				for (i= b + 1; i != b; ++i) {
-					if (i >= dim) i= 1;
-					if (!(i in s)) {
-						print i
-						exit
-					}
+			b= int(rand() * 64) + 1
+			for (i= b + 1; i != b; ++i) {
+				if (i > 64) i= 1;
+				if (!(i in s)) {
+					print i
+					exit
 				}
 			}
 			print "No empty slots!" > "/dev/stderr"
@@ -244,18 +244,18 @@ find_free_tc_slot() {
 tc_psw_wrapper() {
 	local PSW_FILE
 	PSW_FILE=$1; shift
-	cat "$PSW_FILE" | "$TC_BIN" "$@"
+	cat "$PSW_FILE" | "$TC_BIN" -t "$@"
 }
 
 
 APP=${0##*/}
 # Start of command line processing.
 # Define presets.
-TC_BIN=truecrypt-4
+TC_BIN=truecrypt
 PWLIST="$HOME/.pwlist"
 VOLHEADERS_RELPATH="Backups/Volume Headers"
 KEYFILES_RELPATH="../../Key Files"
-MAPPER_PREFIX=/dev/mapper/truecrypt4_
+MAPPER_PREFIX=/dev/mapper/truecrypt
 MOUNT_OPTIONS=
 CONTAINER_IS_FILE=
 RO_MODE=
@@ -324,11 +324,7 @@ system readlink -f "$DIR/.."; DIR=$REPLY
 system readlink -f "$DIR/$VOLHEADERS_RELPATH"; DIR=$REPLY
 for HALF in 0 1
 do
-	MD5SUM=`
-		"$TC_BIN" --backup-headers /dev/stderr "$DEV" \
-			2>& 1 > /dev/null \
-		| chksum
-	`
+	MD5SUM=`dd if="$DEV" bs=512 count=1 2> /dev/null | chksum`
 	case $HALF in
 		0) T=normal;;
 		1) T=hidden;;
@@ -357,19 +353,24 @@ if test -n "$PSW"
 then
 	set -- tc_psw_wrapper "$PSW"
 else
-	set -- "$TC_BIN"
+	set -- "$TC_BIN" -t
 fi
-set -- "$@" -N "$NUM"
+set -- "$@" --slot="$NUM" --protect-hidden=no
 if test -n "$RO_MODE"
 then
 	set -- "$@" --read-only
 	MOUNT_OPTIONS="$MOUNT_OPTIONS${MOUNT_OPTIONS:+,}ro"
 fi
-test -n "$MOUNT_OPTIONS" && set -- "$@" --mount-options "$MOUNT_OPTIONS"
+if test -n "$MP" && test -n "$MOUNT_OPTIONS"
+then
+	set -- "$@" --mount-options="$MOUNT_OPTIONS"
+fi
+test -z "$MP" && set -- "$@" --filesystem=none
 test -n "$FILE" && set -- "$@" -k "$FILE"
 test -z "$PSW" && set -- "$@" -p ''
 set -- "$@" "$DEV"
 test -n "$MP" && set -- "$@" "$MP"
+lsmod | grep -q "^fuse " 2> /dev/null || modprobe fuse
 run "$@"
 DEV=$MAPPER_PREFIX$NUM
 test -b "$DEV"

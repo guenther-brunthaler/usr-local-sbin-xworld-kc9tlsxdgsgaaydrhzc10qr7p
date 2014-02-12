@@ -1,0 +1,5 @@
+#! /bin/sh
+echo "Emptying ccache for user 'portage' and resetting statistics:"
+echo
+exec su -s /bin/sh - portage \
+	sh -c "CCACHE_DIR=/var/tmp/ccache ccache --clear --zero-stats"

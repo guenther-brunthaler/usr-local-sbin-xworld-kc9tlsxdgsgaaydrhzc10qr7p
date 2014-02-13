@@ -13,10 +13,26 @@
 # (c) 2012 - 2013 by Guenther Brunthaler.
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
+shutdown_ifs() {
+	sleep 2
+	# Shut down interfaces which have been brought up using ifup.
+	ifdown -a --allow x-wifi-hotspot
+	# Shut down remaining interfaces.
+	set -- `grep '^allow-x-wifi-hotspot' /etc/network/interfaces`
+	shift
+	local i
+	for i
+	do
+		# Won't hurt if I/F is already down.
+		ifconfig "$i" down
+	done
+	sleep 2
+}
 case $1 in
 	--disable | -d)
 		echo "Disabling WLAN hotspot..."
 		gateway_setup -d
+		shutdown_ifs
 		/etc/init.d/hostapd stop
 		rfkill block wifi
 		gateway_setup
@@ -26,11 +42,10 @@ case $1 in
 		echo "Enabling WLAN hotspot..."
 		gateway_setup -d
 		rfkill unblock wifi
-		sleep 2
-		ifdown -a --allow x-wifi-hotspot
-		sleep 2
+		shutdown_ifs
 		/etc/init.d/hostapd start
-		sleep 1
+		ifup -a --allow x-wifi-hotspot
+		sleep 2
 		gateway_setup
 		/etc/init.d/dnsmasq restart
 	;;

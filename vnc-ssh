@@ -1,13 +1,87 @@
 #! /bin/sh
-# Accept any number of connections (in sequence) via SSH on $PORT.
+exit_version() {
+	wr -s <<- . && exit
+	$APP version 14.44
+
+	(c) 2014 by Guenther Brunthaler.
+	This script is free software.
+	Distribution is permitted under the terms of the GPLv3.
+.
+}
+APP=${0##*/}
+
+exit_help() {
+	wr <<- .
+	$APP -
+	    Export current X11 session via SSH to VNC viewers
+
+	Usage: $APP
+	    [ <options> ... ]
+	    
+	$APP starts x11vnc with the right options to bind to and listen at the
+	localhost address, which cannot be reached from outside except via SSH
+	local port forwarding (ssh client option -L) or some other kind of
+	secure tunneling set up by the user for this purpose.
+	
+	It will also try to enable clipboard and X-selection exchange transfer
+	between the VNC server and the attached viewer.
+	
+	If the VNC viewer supportes UltaVNC's file transfer feature, this will
+	also be supported.
+	
+	This will make the current "real" X11 display available to any VNC
+	viewers which connect through a secure tunnel.
+	
+	Option supported:
+	
+	-n:
+	    Dry run. Show what would be done, but don't actually do anything.
+	-b:
+	    Enable client buffering. This works with most VNC clients, but not
+	    with all so it can be optionally enabled. It caches
+	    already-transferred bitmaps locally in the VNC viewer, allowing to
+	    re-use them and save bandwidth in this case.
+	-p <port>:
+	    Make VNC server listen on port <port> instead of 5900.
+	-h:
+	    Display this help.
+	-t:
+	    Enable text chatting. This only works if the ssvnc package is also
+	    installed. It enables UltraVNC's text chat feature. This starts a
+	    second VNC server which listens on localhost port 7300 and can
+	    also be connected to via an additional SSH tunnel. This second VNC
+	    server represents the contents of the chat window, allowing remote
+	    VNC viewers to participate in the chat. Well, at least I think it
+	    should work that way. Unforunately, in my tests it did not.
+	-V:
+	    Display version information.
+
+.
+	exit_version
+}
+
+
+wr() {
+	test -z "$*" && set -- -c
+	fmt -w "$LINEWIDTH" "$@"
+}
+LINEWIDTH=; tty -s && LINEWIDTH=`tput cols` || LINEWIDTH=; : ${LINEWIDTH:=70}
+
 
 PORT=5900
 #
 DRY_RUN=
-while getopts n OPT
+CLIENT_BUFFERING=
+TEXT_CHAT=
+while getopts tnbhVp: OPT
 do
 	case $OPT in
 		n) DRY_RUN=Y;;
+		b) CLIENT_BUFFERING=Y;;
+		h) exit_help;;
+		p) PORT=$OPTARG;;
+		V) exit_version;;
+		t) TEXT_CHAT=Y;;
 		*) false; exit
 	esac
 done
@@ -24,7 +98,13 @@ do
 done
 set -- x11vnc -display "$DISP" -listen localhost -autoport "$PORT"
 test -n "$AUTH" && set -- "$@" -auth "$AUTH"
-set -- "$@" -forever
+test -n "$CLIENT_BUFFERING" && set -- "$@" -ncache 10
+if test -n "$TEXT_CHAT"
+then
+	sv=`which ssvnc 2> /dev/null`
+	test -n "$sv" && test -x "$sv" && set -- "$@" -chatwindow
+fi
+set -- "$@" -forever -input KMBCF
 if test -n "$DRY_RUN"
 then
 	echo "SIMULATION: $*"

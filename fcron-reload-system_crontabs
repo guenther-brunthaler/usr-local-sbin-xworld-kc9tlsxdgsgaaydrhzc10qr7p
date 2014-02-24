@@ -1,0 +1,18 @@
+#! /bin/sh
+cat << "EOF" >& 2
+Combining crontabs for fcron from the following sources as a new system
+crontab:
+
+/etc/crontab
+/etc/fcron/fcrontab
+/etc/cron.d/*
+
+Fcron will be notified about the changes.
+
+Run
+
+$ fcrontab -l
+
+to review the resulting system crontab.
+EOF
+exec /usr/libexec/check_system_crontabs -s0

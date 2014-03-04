@@ -15,4 +15,4 @@ $ fcrontab -l
 
 to review the resulting system crontab.
 EOF
-exec /usr/libexec/check_system_crontabs -s0
+exec /usr/libexec/check_system_crontabs -i -v

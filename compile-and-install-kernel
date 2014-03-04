@@ -33,7 +33,7 @@ if test $SKIPTO -le 3; then
 fi
 if test $SKIPTO -le 4; then
 	echo "*** PHASE 4 ***"
-	module-rebuild rebuild
+	emerge -1 @module-rebuild
 fi
 if test $SKIPTO -le 5; then
 	echo "*** PHASE 5 ***"

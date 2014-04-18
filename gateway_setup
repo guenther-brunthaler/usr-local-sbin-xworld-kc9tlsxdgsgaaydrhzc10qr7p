@@ -8,7 +8,7 @@
 # By default, all interfaces with routes except that with the
 # default route will be enabled as forwarding source networks.
 #
-# (c) 2012 by Guenther Brunthaler.
+# (c) 2012-2014 by Guenther Brunthaler.
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
 
@@ -86,7 +86,7 @@ do
 	fi
 done < "$TF"
 rmtf
-test -n "$INTERNET_IF"
+test -n "$INTERNET_IF" || test $enable = 0
 
 if test $enable = 1
 then
@@ -122,9 +122,12 @@ do
 	fi
 	sysctl -q -w net.ipv4.conf."$IF".forwarding=$enable
 done
-what=Disabling; test $enable = 1 && what=Enabling
-echo "$what interface $INTERNET_IF as forwarding target." >& 2
-sysctl -q -w net.ipv4.conf."$INTERNET_IF".forwarding=$enable
+if test -n "$INTERNET_IF"
+then
+	what=Disabling; test $enable = 1 && what=Enabling
+	echo "$what interface $INTERNET_IF as forwarding target." >& 2
+	sysctl -q -w net.ipv4.conf."$INTERNET_IF".forwarding=$enable
+fi
 echo >& 2
 if test $enable = 1
 then

@@ -1,0 +1,37 @@
+#! /bin/sh
+set -e
+trap 'echo "Failed!" >& 2' 0
+JOURNAL=has_journal
+LABEL=
+SU_RESERVED=0
+BLKSZ=
+DISCARD=discard
+while getopts JL:m:b:D OPT
+do
+	case $OPT in
+		J) JOURNAL=^has_journal;;
+		L) LABEL=$OPTARG;;
+		m) SU_RESERVED=$OPTARG;;
+		b) BLKSZ=$OPTARG;;
+		D) DISCARD=nodiscard;;
+		*) false
+	esac
+done
+shift `expr $OPTIND - 1`
+DEV=$1; shift
+test $# = 0
+test -n "$DEV"
+test -b "$DEV"
+test -n "$LABEL"
+{
+	set -- mkfs.ext4 -m"$SU_RESERVED" -O "^ext_attr,$JOURNAL" \
+		-L "$LABEL" -E "$DISCARD"
+	test -n "$BLKSZ" && set -- "$@" -b"$BLKSZ"
+	set -x
+	"$@" "$DEV"
+	tune2fs -o ^user_xattr,^acl -e remount-ro "$DEV"
+	fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
+	echo "*** Success! ***"
+	tune2fs -l "$DEV"
+} 2>& 1 | less
+trap - 0

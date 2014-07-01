@@ -3,7 +3,12 @@ LOGFILE=${1:?Usage: $0 <file>.log}
 trap "echo 'Failed!'" 0
 set -e
 cd /var/log
+LOGFILE=${LOGFILE#/var/log/}
 test -f "$LOGFILE"
-ls --sort=version archive/"$LOGFILE".[1-9]*.gz -1r | xargs zcat
+{
+	ls --sort=version -1r \
+		"$LOGFILE".[1-9]*.gz archive/"$LOGFILE".[1-9]*.gz \
+	|| :
+} 2> /dev/null | xargs zcat
 cat "$LOGFILE"
 set - 0

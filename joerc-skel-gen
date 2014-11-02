@@ -2,7 +2,7 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 12.251
+# Version 14.306
 # Written by Guenther Brunthaler.
 
 
@@ -99,21 +99,35 @@ my $USER_VALA= << "." . $USER_autoprog_x
 . << "." . $USER_autoprog_x . $USER_SIMPLICITY;
    *.vapi
 .
-my $USER_NEWSTUFF= << "." . $USER_prog_x . $USER_VALA;
-   \40
-    Completely new entries.
-   \40
+my $USER_TCL= << ".";
+   -autoindent
+   -syntax tcl
+.
+$USER_TCL= << "."
     TCL via shabang
     (According to FHS 2.3, the following
     executables must at least have a symlink in
     /usr/bin if they are installed at all.)
-   *
-   +#!\\+\\[ \t]\\+\\[a-z/]/tclsh\\>
-   +#!\\+\\[ \t]\\+\\[a-z/]/wish\\>
-   +#!\\+\\[ \t]\\+\\[a-z/]/expect\\>
-   -autoindent
-   -syntax tcl
 .
+. do {
+   my $out= '';
+   my($ind)= $USER_TCL =~ /^(\s+)/;
+   my$pfx= "\\+\\[ \t]\\+\\[a-z/]";
+   foreach my $rx ("$pfx/", "$pfx\\n#\\*\\\\\\nexec ") {
+      foreach my $tool (qw/tclsh wish expect/) {
+         $out.= "$ind*\n$ind+#!$rx$tool\\>\n" . $USER_TCL . $USER_prog_x;
+      }
+   }
+   $out;
+};
+my $USER_NEWSTUFF= << "EOF"
+   \40
+    Completely new entries.
+   \40
+EOF
+   . $USER_TCL 
+   . $USER_VALA
+;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
 .

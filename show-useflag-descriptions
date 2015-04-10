@@ -1,7 +1,0 @@
-#!/bin/sh
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/show-useflag-descriptions $
-# $Author: root(xtreme) $
-# $Date: 2006-08-23T03:51:58.733319Z $
-# $Revision: 212 $
-
-less /usr/portage/profiles/use.desc /usr/portage/profiles/use.local.desc /etc/portage/package.use

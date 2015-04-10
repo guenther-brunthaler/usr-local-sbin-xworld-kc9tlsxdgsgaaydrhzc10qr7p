@@ -1,0 +1,2 @@
+#! /bin/sh
+grep ^flags /proc/cpuinfo | head -n1 | cut -d: -f2- | fmt -w1 | sort -u

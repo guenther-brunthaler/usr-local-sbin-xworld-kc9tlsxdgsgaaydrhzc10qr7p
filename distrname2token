@@ -1,0 +1,17 @@
+#! /bin/sh
+# Display the name of the current Linux distribution converted into a token
+# which can be used as part of directory names to specify files specific to
+# this distribution. The token will only be made of lower-case ASCII
+# alphanumerics and possibly underscores.
+#
+# Nothing will be displayed and a failure code will be returned if the current
+# distribution could not be identified.
+#
+# If possible, keep this synchronized with
+# "/usr/local/share/xworld/local/etc/profile.d/xworld.sh".
+lsb_release -i 2> /dev/null | tr A-Z a-z | sed '
+	s,.*:[^a-z0-9]*,,
+	s/[^0-9a-z]/_/g
+	s/__*/_/g
+	s/_$//
+'

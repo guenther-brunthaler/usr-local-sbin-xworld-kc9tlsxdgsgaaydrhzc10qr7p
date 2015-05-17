@@ -2,7 +2,7 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 14.306
+# Version 15.137
 # Written by Guenther Brunthaler.
 
 
@@ -120,6 +120,11 @@ $USER_TCL= << "."
    }
    $out;
 };
+my $USER_RUST= << "." . $USER_autoprog_x;
+   \40
+    Rust source file
+   *.rs
+.
 my $USER_NEWSTUFF= << "EOF"
    \40
     Completely new entries.
@@ -127,6 +132,7 @@ my $USER_NEWSTUFF= << "EOF"
 EOF
    . $USER_TCL 
    . $USER_VALA
+   . $USER_RUST
 ;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>

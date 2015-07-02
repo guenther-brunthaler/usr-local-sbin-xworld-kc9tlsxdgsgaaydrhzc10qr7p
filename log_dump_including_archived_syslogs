@@ -11,4 +11,4 @@ test -f "$LOGFILE"
 	|| :
 } 2> /dev/null | xargs zcat
 cat "$LOGFILE"
-set - 0
+trap - 0

@@ -1,6 +1,6 @@
 #! /bin/sh
 # Show a report of the currently active xinetd services.
-# Written in 2008 by Guenther Brunthaler.
+# Written in 2008-2015 by Guenther Brunthaler.
 
 
 die() {
@@ -20,9 +20,9 @@ DUMPFILE=/var/run/xinetd.dump
 test -n "$PID" || die "xinetd is not currently running!"
 test -e "$DUMPFILE" && run rm "$DUMPFILE"
 kill -USR1 $PID
-TF=`tempfile`
+TF=`mktemp "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
 test $? = 0 || die "Could not create a temporary file!"
-trap "rm \"$TF\"" 0
+trap "rm -- \"$TF\"" 0
 run cat "$DUMPFILE" > "$TF"
 run rm "$DUMPFILE"
 less -F "$TF"

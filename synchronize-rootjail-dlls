@@ -1,9 +1,9 @@
 #! /bin/sh
 show_version() {
 	wr <<- .
-	$APP version 14.18
+	$APP version 15.213
 
-	(c) 2008-2014 by Guenther Brunthaler.\n
+	(c) 2008-2015 by Guenther Brunthaler.\n
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
@@ -124,7 +124,7 @@ libfilter() {
 
 tfile() {
 	local NAME_axpy49v3dqu1chnlphv7e7yug
-	NAME_axpy49v3dqu1chnlphv7e7yug="`run tempfile`"
+	NAME_axpy49v3dqu1chnlphv7e7yug="`run mktemp "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`"
 	test -n "$NAME_axpy49v3dqu1chnlphv7e7yug" \
 		|| die "Could not create temporary file!"
 	eval $1=\$NAME_axpy49v3dqu1chnlphv7e7yug

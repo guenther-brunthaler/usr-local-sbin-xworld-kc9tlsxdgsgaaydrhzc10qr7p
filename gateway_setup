@@ -8,7 +8,7 @@
 # By default, all interfaces with routes except that with the
 # default route will be enabled as forwarding source networks.
 #
-# (c) 2012-2014 by Guenther Brunthaler.
+# (c) 2012-2015 by Guenther Brunthaler.
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
 
@@ -42,7 +42,7 @@ case $1 in
 		enable=1
 esac
 
-TF=`tempfile`
+TF=`mktemp "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
 LC_ALL=C "$ROUTE" -n 2> /dev/null | awk '
 	$1 == "0.0.0.0" {
 		# Use this as gateway IF.

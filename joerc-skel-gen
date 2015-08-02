@@ -2,29 +2,39 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 15.137
+# Version 15.213
 # Written by Guenther Brunthaler.
 
 
 # First, some general comments on the "joe" syntax detection feature.
 #
-# In order to make block of settings depending on a file type, two
-# sorts of conditions are supported.
+# In order to make block of settings depending on a file type, two sorts of
+# conditions are supported.
 #
 # The first one is to check for a file extension such as "*" (matches all
 # extensions) or "*.txt" (matches only files ending in ".txt").
 #
-# The second sort is a "joe"-style regular expression which has to match
-# the first line of the file's contents. These are the same expressions
-# as used in joe's built-in search command.
+# The second sort is a "joe"-style regular expression which has to match the
+# start of the file's contents. These are the same expressions as used in
+# joe's built-in search command. Note that such expressions may include
+# "\n", and will then match more than just the very first line.
 #
-# Of those types of conditions, the first type is mandatory for a new
-# block of statements - even if it is just "*".
+# Also note that while joe's "\*" wildcard does not match a "\n", its "\+"
+# can. Unfortunately, set complement "\[^x]" does not include control
+# characters, and sets may not include nested sets or wildcards. Therefore,
+# one has to try something like this to match a mulit-line range of text
+# starting with the substring "begin" and ending with the substring "end":
 #
-# More conditions can follow the first condition of a new block of statements.
+# "begin\+\[A-Za-z# .,:\n]end".
 #
-# But those conditions will always be logical AND-combined with the
-# other conditions.
+# Of those types of conditions, the first type is mandatory for a new block
+# of statements - even if it is just "*".
+#
+# More conditions can follow the first condition of a new block of
+# statements.
+#
+# But those conditions will always be logical AND-combined with the other
+# conditions.
 #
 # This means that
 #
@@ -37,6 +47,7 @@
 # This is what the "duplicate"-feature of this tool has been made for.
 
 
+# What files this tool shall read, transform and generate.
 my @joerc_files= (
    {
         original => '/etc/joe/joerc'
@@ -49,6 +60,7 @@ my @joerc_files= (
 );
 my $begin_modification_tag= ' # *** BEGIN CHANGES BLOCK';
 my $end_modification_tag= ' # *** END CHANGES BLOCK';
+$ENV{NULL}= "";
 # Frequently used variants. Use 'USER_' prefix.
 my $USER_prog= << '.';
    -indentc 32
@@ -148,50 +160,70 @@ my $USER_JavaScript= [map << "=" . $_, << "+", << "."];
 # What to change.
 my @changes= (
    # Format: An anonymous hash for each change.
+   #
    # Hash keys:
+   #
    # trigger => $SINGLE_STRING
    # trigger => $STRING_ARRAY
-   #  Where to start searching for an empty line.
-   #  Will be matched against beginning of each line.
-   #  Will match only if followed by whitespace or EOL.
-   #  The text to add will be inserted before the
-   #  first empty line following the matching line,
-   #  enclosed in tag lines.
-   #  If the value for 'trigger' is an anonymous array
-   #  rather than a string, multiple triggers may be
-   #  specified, and the same actions occurs for every
-   #  trigger.
+   #
+   #  Where to start searching for an empty line. Will match only if
+   #  followed by whitespace or EOL.
+   #
+   #  The trigger will be matched against the very beginning of the input
+   #  line. All space characters in the trigger text will match one or more
+   #  whitespace characters at this position.
+   #
+   #  The text to add will be inserted before the first empty line following
+   #  the matching line, enclosed in tag lines.
+   #
+   #  If the value for 'trigger' is an anonymous array rather than a string,
+   #  multiple triggers may be specified, and the same actions occurs for
+   #  every trigger.
+   #
    #  Each trigger will only match the first time.
+   #
+   # ftrigger => $SINGLE_STRING
+   # ftrigger => $STRING_ARRAY
+   #
+   #  Works exactly like 'trigger', but matches whether or not the input line
+   #  is prefixed with any amount of whitespace ("fuzzy trigger").
+   #
    # add => $MULTILINE_STRING
-   #  The text to add. An arbitrary number of
-   #  full lines, each terminated by a newline.
-   #  The newline of the last line is optional and
-   #  will be automatically added if missing.
-   #  The minimum indentation of all lines is determined
-   #  and will be stripped off all lines.
-   #  The text may contain references to environment
-   #  variables of the form $NAME or ${NAME}.
-   #  "$" alone can be quoted as "$$".
+   #
+   #  The text to add. An arbitrary number of full lines, each terminated by
+   #  a newline. The newline of the last line is optional and will be
+   #  automatically added if missing.
+   #
+   #  The minimum indentation of all lines is determined and will be
+   #  stripped off all lines.
+   #
+   #  The text may contain references to environment variables of the form
+   #  $NAME or ${NAME}. "$" alone can be quoted as "$$". The predefined
+   #  variable $NULL contains an empty string. It can be used after
+   #  whitespace at the beginning of a line to avoid the removal of
+   #  whitespace following it, which might otherwise occur as part of the
+   #  minimum indentation stripping as explained above.
+   #
    # insert => $MULTILINE_STRING
-   #  The text to be inserted directly after the
-   #  trigger. Same format as for "add".
-   #  This text will, however, not become part of the
-   #  buffer to be used for "duplicate".
+   #
+   #  The text to be inserted directly after the trigger. Same format as for
+   #  "add". This text will, however, not become part of the buffer to be
+   #  used for "duplicate".
+   #
    # duplicate => $SINGLE_MULTILINE_STRING
    # duplicate => $MULTIILINE_STRING_ARRAY
-   #  A string or anonymous array of multiline strings,
-   #  like the value for the "add"-key.
-   #  When the first trigger for a hash matches,
-   #  and the "add"-text has been added, the whole section
-   #  following the trigger line until the first empty line
-   #  (after the added text) will be copied to a buffer.
-   #  Then, for each string in the duplicates,
-   #  that buffer will be added, prefixed by an empty line
-   #  followed by a line containing only the duplicate text.
-     {trigger => ' -backpath', add => << '.'}
-      -backpath $HOME/.editor-backups
-.
-   , {trigger => ' -break_hardlinks', add => << '.'}
+   #
+   #  A string or anonymous array of multiline strings, like the value for
+   #  the "add"-key.
+   #
+   #  When the first trigger for an input line matches, and the "add"-text
+   #  has been added, the whole section following the trigger line until the
+   #  first empty line (after the added text) will be copied to a buffer.
+   #
+   #  Then, for each string in the duplicates, that buffer will be added,
+   #  prefixed by an empty line followed by a line containing only the
+   #  duplicate text.
+     {trigger => ' -break_hardlinks', add => << '.'}
        This is exactly what we want: Break hard links, but not symlinks.
       -break_hardlinks
 .
@@ -201,7 +233,14 @@ my @changes= (
        feature rather useless.
       --break_links
 .
-   , {trigger => "*", add => $USER_nowrap}
+   , {trigger => ' -french', add => << '.'}
+      -french
+.
+   , {trigger => "*", add => << "."}
+       What a braindead idea! Try word-wrapping a configuration file, for
+       instance...
+      $USER_nowrap
+.
    , {trigger => '-istep 2', add => << '.'}
        # ANSI-Tab text file as global default.
       --guess_indent
@@ -210,7 +249,6 @@ my @changes= (
       -istep 1
       -indentc 9
       -rmargin 79
-      -french
 .
    , {
       trigger => [
@@ -219,7 +257,6 @@ my @changes= (
       ], add => $USER_prog
    }
    , {trigger => [qw/*.tex *.sty/], add => $USER_pnowrap}
-   , {trigger => "*.txt", add => $USER_nowrap}
    , {trigger => [qw/*.asm *.s *.S/], add => $USER_nowrap}
    , {
       trigger => [qw/*.sml *.ml *.mli/]
@@ -275,7 +312,7 @@ my @changes= (
    , {trigger => [qw/*.sql/], add => $USER_prog}
    , {trigger => [qw/*.xml/], add => $USER_pnowrap}
    , {trigger => [qw/*.xsd/], add => $USER_pnowrap}
-   , {trigger => [qw/*.htm/], add => $USER_pnowrap}
+   , {trigger => [qw/*.htm *.html/], add => $USER_pnowrap}
    , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
    , {trigger => "*.rb", add => $USER_RUBY}
 );
@@ -292,29 +329,51 @@ sub globrx(\@) {
 }
 
 
-my($c, $i, $any, $st, $k, $t);
+my($c, $i, $any, $st, $k, $t, @list);
 foreach ($begin_modification_tag, $end_modification_tag) {
    $_= "$_\n";
 }
 # Preprocess @changes.
 foreach $c (@changes) {
    # Keys which must exist.
-   foreach $k (qw/trigger add/) {
-      unless (exists $c->{$k}) {
-         die "Missing key '$k' in \@changes entry!";
+   foreach $k (qw[trigger|ftrigger add]) {
+      @list= split '\|', $k;
+      undef $any;
+      foreach $i (@list)  {
+         if (exists $c->{$i}) {
+            $any= 1; last;
+         }
+      }
+      unless ($any) {
+         die "Missing key ", join(
+            " or ", map "'$_'", @list
+         )," in \@changes entry!";
       }
    }
    # Keys for values to be coerced into arrays of strings.
-   foreach $k (qw/trigger duplicate/) {
+   foreach $k (qw/trigger ftrigger duplicate/) {
       unless (exists $c->{$k}) {$c->{$k}= []}
       elsif (!ref $c->{$k}) {$c->{$k}= [$c->{$k}]}
    }
    foreach $k (@{$c->{trigger}}) {
-      $t= quotemeta $k;
+      if (($t)= $k =~ /^[ ](.*)/) {
+         $t= quotemeta $t;
+         $t= qr/\s+ $t/x;
+      } else {
+         $t= quotemeta $k;
+      }
       $k= qr/ ^ $t (?: \s | $ ) /x;
    }
+   # Merge 'ftrigger' (differently preprocessed) into 'trigger'.
+   foreach $k (@{$c->{ftrigger}}) {
+      $t= quotemeta $k;
+      $k= qr/ ^ \s* $t (?: \s | $ ) /x;
+      push @{$c->{trigger}}, $k;
+   }
+   delete $c->{ftrigger};
    sub rlcip(\$) {
-      # Remove longest common indentation prefix from lines.
+      # Remove longest common indentation prefix from lines. Only after
+      # that, expand any environment variable references.
       my $ref= shift;
       my $t= $$ref;
       chomp $t;
@@ -337,13 +396,18 @@ foreach $c (@changes) {
       $$ref =~ s<
          \$
          (?:
-            \{ (\w+) \}
-            | (\w+)
-            | \$
+            \{ (\w+) \} # $1.
+            | (\w+) # $2.
+            | \$ # Neither.
          )
       ><
-         $1 || $2 ? $ENV{$1 || $2} : '$'
-         or die "Undefined \$ENV{" . ($1 || $2) . "}"
+         $1 || $2 ? do {
+            my $v;
+            unless (defined($v = $ENV{$1 || $2})) {
+               die "Undefined \$ENV{" . ($1 || $2) . "}";
+            }
+            $v;
+         } : '$'
       >gex;
    }
    if (@{$c->{duplicate}}) {

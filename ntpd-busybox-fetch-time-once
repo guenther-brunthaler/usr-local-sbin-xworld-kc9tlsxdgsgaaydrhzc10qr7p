@@ -1,2 +1,2 @@
 #! /bin/sh
-exec busybox_pbyqxzl1ktqlk3fjm3arlrclg ntpd -dnqp 0.debian.pool.ntp.org
+exec busybox-pbyqxzl1ktqlk3fjm3arlrclg ntpd -dnqp 0.debian.pool.ntp.org

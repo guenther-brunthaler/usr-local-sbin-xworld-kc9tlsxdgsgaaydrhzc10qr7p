@@ -2,7 +2,7 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 15.213
+# Version 15.237
 # Written by Guenther Brunthaler.
 
 
@@ -12,7 +12,9 @@
 # conditions are supported.
 #
 # The first one is to check for a file extension such as "*" (matches all
-# extensions) or "*.txt" (matches only files ending in ".txt").
+# extensions) or "*.txt" (matches only files ending in ".txt"). Possibly
+# this may not only match file extensions but arbitrary "glob" wildcards,
+# but I have never tried it.
 #
 # The second sort is a "joe"-style regular expression which has to match the
 # start of the file's contents. These are the same expressions as used in
@@ -22,7 +24,7 @@
 # Also note that while joe's "\*" wildcard does not match a "\n", its "\+"
 # can. Unfortunately, set complement "\[^x]" does not include control
 # characters, and sets may not include nested sets or wildcards. Therefore,
-# one has to try something like this to match a mulit-line range of text
+# one has to try something like this to match a multi-line range of text
 # starting with the substring "begin" and ending with the substring "end":
 #
 # "begin\+\[A-Za-z# .,:\n]end".
@@ -41,8 +43,8 @@
 # *.c
 # *.h
 #
-# will never match anything. Instead, two separate blocks should be created,
-# using a single wildcard expression only.
+# will never match anything. Instead, two separate blocks need to be
+# created, using a single wildcard expression per block only.
 #
 # This is what the "duplicate"-feature of this tool has been made for.
 
@@ -241,7 +243,7 @@ my @changes= (
        instance...
       $USER_nowrap
 .
-   , {trigger => '-istep 2', add => << '.'}
+   , {trigger => ['-istep 2', '-istep 4'], add => << '.'}
        # ANSI-Tab text file as global default.
       --guess_indent
       -smarthome

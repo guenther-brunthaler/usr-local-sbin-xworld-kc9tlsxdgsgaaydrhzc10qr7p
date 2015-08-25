@@ -2,10 +2,10 @@
 # Create a mount point directory, or set the conventional
 # modes and owner for an existing one.
 #
-# $HeadURL: /caches/xsvn/uxadm/trunk/usr/local/sbin/mkmountpoint $
-# $Author: root $
-# $Date: 2007-05-06T15:05:27.775990Z $
-# $Revision: 653 $
+# Version 15.237
+# (c) 2015 by Guenther Brunthaler.
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
 
 
 die() {
@@ -13,15 +13,27 @@ die() {
 	false; exit
 }
 
-
-while true; do
-	if test ! -e "$1"; then
-		mkdir -p "$1" \
+while :
+do
+	if test ! -e "$1"
+	then
+		mkdir -p -- "$1" \
 			|| die "Could not create mount point directory '$1'!"
-	elif test ! -d "$1"; then
+	elif test ! -d "$1"
+	then
 		die "Mount point '$1' already exists and is not a directory!"
 	fi
-	chown nobody:nogroup "$1" || die "Could not set owner for '$1'!"
+	chown nobody "$1" || die "Could not set owner for '$1'!"
+	any=false
+	for g in nogroup nobody
+	do
+		if chgrp $g "$1" 2> /dev/null
+		then
+			any=true
+			break
+		fi
+	done
+	$any || die "Could not set group for '$1'!"
 	chmod ugo=,-st "$1" || die "Could not set permissions for '$1'!"
 	echo "Mount point directory '$1' has successfully been set up!"
 	shift

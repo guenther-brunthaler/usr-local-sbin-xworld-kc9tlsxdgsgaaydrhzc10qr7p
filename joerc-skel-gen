@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 15.237
-# Written by Guenther Brunthaler.
+# Version 2016.34
+# Written in 2008 - 2016 by Guenther Brunthaler.
 
 
 # First, some general comments on the "joe" syntax detection feature.
@@ -12,14 +12,17 @@
 # conditions are supported.
 #
 # The first one is to check for a file extension such as "*" (matches all
-# extensions) or "*.txt" (matches only files ending in ".txt"). Possibly
-# this may not only match file extensions but arbitrary "glob" wildcards,
-# but I have never tried it.
+# extensions) or "*.txt" (matches only files ending in ".txt"). Possibly this
+# may not only match file extensions but arbitrary "glob" wildcards, but I
+# have never tried it.
 #
 # The second sort is a "joe"-style regular expression which has to match the
-# start of the file's contents. These are the same expressions as used in
-# joe's built-in search command. Note that such expressions may include
-# "\n", and will then match more than just the very first line.
+# start of the file's contents. Such conditions need to be preceeded with a
+# "+" character at the beginning of the line, immediately being followed by a
+# match expression with no separating white space. These are the same
+# expressions as used in joe's built-in search command. Note that such
+# expressions may include "\n", and will then match more than just the very
+# first line.
 #
 # Also note that while joe's "\*" wildcard does not match a "\n", its "\+"
 # can. Unfortunately, set complement "\[^x]" does not include control
@@ -47,6 +50,10 @@
 # created, using a single wildcard expression per block only.
 #
 # This is what the "duplicate"-feature of this tool has been made for.
+#
+# Also note that if more than one block matches, only the last matching block
+# is actually used. The blocks should therefore be ordered from most general
+# to most specific pattern.
 
 
 # What files this tool shall read, transform and generate.
@@ -290,10 +297,15 @@ my @changes= (
    , {trigger => "*.py", add => $USER_prog}
    , {
       trigger => "*.lua", add => $USER_prog
+      # Disable Lua syntax highlighing because it's severely broken.
       , add  => $USER_prog_x . "   -syntax none"
       , duplicate => [
          "*\n+#!\\+\\[ \t]\\+\\[a-z/]/lua\\>"
          , "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]lua\\>"
+         , "*\n+#!\\+\\[ 	]\\[a-z/]\\+\\[a-z/]\\n"
+         . "if\\+\\[ 	]false\\n"
+         . "\\+\\[ 	]then\\n\\+\\[ 	]--[=[\\n\\+\\[ 	]fi\\n"
+         . "\\+\\[ 	]exec\\+\\[ 	]lu\\[av]\\[0-9]\\+\\[0-9.-+_]\\>"
       ]
    }
    , {

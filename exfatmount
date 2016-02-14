@@ -40,7 +40,7 @@ usage() {
 	  such "remount" which will not be used by default.
 
 	Version 12.248
-	(c) 2007 - 2012 by Guenther Brunthaler.
+	Copyright (c) 2007-2012 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.

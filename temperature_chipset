@@ -1,15 +1,35 @@
 #! /bin/sh
-gpu=`/opt/vc/bin/vcgencmd measure_temp | tr -cd '0-9.'`
-cpu=`awk '{printf "%.1f\n", $1 / 1e3}' /sys/class/thermal/thermal_zone0/temp`
-{ echo GPU $gpu; echo CPU $cpu; } | sort -k2nr \
-| {
-	read l1 t1
-	read l2 t2
-	if test $t1 = $t2
+{
+	src=/sys/class/thermal/thermal_zone0/temp
+	if test -f "$src"
 	then
-		echo $t1
-	else
-		echo $l1 $t1
-		echo $l2 $t2
+		echo CPU `awk '{printf "%.1f\n", $1 / 1e3}' "$src"`
 	fi
-}
+	src=/opt/vc/bin/vcgencmd
+	if test -x "$src"
+	then
+		echo GPU `"$src" measure_temp | tr -cd '0-9.'`
+	fi
+} | sort -k2nr | awk '
+	BEGIN {n= 0}
+
+	{l[n]= $1; t[n++]= $2}
+
+	END {
+		if (n == 0) print "(No supported temperature sources.)"
+		else if (n == 1) print t[0]
+		else {
+			last= t[0];
+			for (i= 1; i < n; ++i) {
+				if (t[i] != last) {
+					last= ""
+					break
+				}
+			}
+			if (last != "") print last
+			else {
+				for (i= 0; i < n; ++i) print l[i] " " t[i]
+			}
+		}
+	}
+'

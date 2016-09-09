@@ -1,0 +1,12 @@
+#! /bin/sh
+
+set -e
+trap 'test $? = 0 || echo "${0##*/} failed!" >& 2' 0
+for bb in busybox-pbyqxzl1ktqlk3fjm3arlrclg busybox-localsite busybox
+do
+	bb=`which $bb 2> /dev/null` && break
+done
+lines=`tput lines || echo ${LINES:-25}`
+clear
+"$bb" logread | tail -n $lines
+exec "$bb" logread -f

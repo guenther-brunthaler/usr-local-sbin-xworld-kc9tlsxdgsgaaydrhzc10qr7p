@@ -16,7 +16,10 @@
 	{l[n]= $1; t[n++]= $2}
 
 	END {
-		if (n == 0) print "(No supported temperature sources.)"
+		if (n == 0) {
+			print "(No supported temperature sources.)" \
+				> "/dev/stderr"
+		}
 		else if (n == 1) print t[0]
 		else {
 			last= t[0];

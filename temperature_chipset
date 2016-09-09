@@ -1,0 +1,15 @@
+#! /bin/sh
+gpu=`/opt/vc/bin/vcgencmd measure_temp | tr -cd '0-9.'`
+cpu=`awk '{printf "%.1f\n", $1 / 1e3}' /sys/class/thermal/thermal_zone0/temp`
+{ echo GPU $gpu; echo CPU $cpu; } | sort -k2nr \
+| {
+	read l1 t1
+	read l2 t2
+	if test $t1 = $t2
+	then
+		echo $t1
+	else
+		echo $l1 $t1
+		echo $l2 $t2
+	fi
+}

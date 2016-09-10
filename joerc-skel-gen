@@ -146,6 +146,11 @@ my $USER_RUST= << "." . $USER_autoprog_x;
     Rust source file
    *.rs
 .
+my $USER_SCALA= << "." . $USER_autoprog_x;
+   \40
+    Scala source file
+   *.scala
+.
 my $USER_NEWSTUFF= << "EOF"
    \40
     Completely new entries.
@@ -154,6 +159,7 @@ EOF
    . $USER_TCL 
    . $USER_VALA
    . $USER_RUST
+   . $USER_SCALA
 ;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>

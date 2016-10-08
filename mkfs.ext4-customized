@@ -1,6 +1,6 @@
 #! /bin/sh
 set -e
-trap 'echo "Failed!" >& 2' 0
+trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
 JOURNAL=has_journal
 LABEL=
 SU_RESERVED=0
@@ -17,16 +17,16 @@ do
 		*) false
 	esac
 done
-shift `expr $OPTIND - 1`
+shift `expr $OPTIND - 1 || :`
 DEV=$1; shift
 test $# = 0
 test -n "$DEV"
 test -b "$DEV"
 test -n "$LABEL"
 {
-	set -- mkfs.ext4 -m"$SU_RESERVED" -O "^ext_attr,$JOURNAL" \
+	set mkfs.ext4 -m"$SU_RESERVED" -O "^ext_attr,$JOURNAL" \
 		-L "$LABEL" -E "$DISCARD"
-	test -n "$BLKSZ" && set -- "$@" -b"$BLKSZ"
+	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
 	set -x
 	"$@" "$DEV"
 	tune2fs -o ^user_xattr,^acl -e remount-ro "$DEV"
@@ -34,4 +34,3 @@ test -n "$LABEL"
 	echo "*** Success! ***"
 	tune2fs -l "$DEV"
 } 2>& 1 | less
-trap - 0

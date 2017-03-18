@@ -1,0 +1,49 @@
+#! /bin/sh
+m=/dev/gsmmodem
+regex='^Bus [0-9]* Device [0-9]*: ID 12d1:1001 Huawei Technologies'
+set -e
+trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
+try=1
+maxtries=5
+while :
+do
+	if test ! -c "$m"
+	then
+		err="Modem is not present on the USB bus."
+	elif printf 'AT\r\n' > "$m"
+	then
+		err=
+	else
+		err="Modem ist not responding."
+	fi
+	sleep 1
+	test -z "$err" && break
+	echo $err
+	if test $try -ge 5
+	then
+		echo "Giving up!"
+		false || exit
+	fi
+	echo "Re-trying, attempt $try of $maxtries..."
+	try=`expr $try + 1`
+done
+for c in 0 7 4
+do
+	printf 'AT +CFUN=%s\r\n' $c > "$m" 2> /dev/null || :
+	sleep 1
+done
+printf 'AT +CFUN=6\r\n' > "$m"
+echo "Sent reset command to modem."
+echo "Waiting for modem to leave the USB bus..."
+while :
+do
+	lsusb | grep -q "$regex" || break
+	sleep 1
+done
+echo "Waiting for modem to rejoin the USB bus..."
+while :
+do
+	lsusb | grep -q "$regex" && break
+	sleep 1
+done
+echo "Done."

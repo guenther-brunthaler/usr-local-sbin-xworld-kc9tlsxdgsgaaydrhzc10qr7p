@@ -11,15 +11,9 @@
 # Distribution is permitted under the terms of the GPLv3.
 set -e
 trap 'test 0 = $? || echo "$0 failed!" >& 2' 0
-test 0 != $#
-multiple=false; test 1 != $# && multiple=true
+
 p='[^ ]\{1,\} '; p2=$p$p; p4=$p2$p2; p=${p%" "}
-for tfile
-do
-	if $multiple
-	then
-		echo "*** Table '$tfile' ***"
-	fi
+single() {
 	sed '
 		/^'"$p2"'crypt / {
 			h
@@ -28,9 +22,29 @@ do
 			G
 			s/^\(.*\)\n\('"$p4"'\)'"$p"'\( [^ ].*\)/\2\1\3/
 		}
-	' "$tfile"
-done
-if $multiple
+	'${1+ "$1"}
+}
+
+if test 0 = $#
 then
-	echo "*** End of table dumps. ***"
+	single
+else
+	if  test 1 = $#
+	then
+		multiple=false
+	else
+		multiple=true
+	fi
+	for tfile
+	do
+		if $multiple
+		then
+			echo "*** Table '$tfile' ***"
+		fi
+		single "$tfile"
+	done
+	if $multiple
+	then
+		echo "*** End of table dumps. ***"
+	fi
 fi

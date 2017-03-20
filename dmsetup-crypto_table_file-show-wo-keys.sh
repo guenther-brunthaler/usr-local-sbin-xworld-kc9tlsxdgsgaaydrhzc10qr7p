@@ -22,13 +22,9 @@ p='
 		s/^\(.*\)\n\('"$p4"'\)'"$p"'\( [^ ].*\)/\2\1\3/
 	}
 '
-single() {
-	sed "$p"${1+ "$1"}
-}
-
 if test 0 = $#
 then
-	single
+	sed "$p"
 else
 	if  test 1 = $#
 	then
@@ -42,7 +38,7 @@ else
 		then
 			echo "*** Table '$tfile' ***"
 		fi
-		single "$tfile"
+		sed "$p" "$tfile"
 	done
 	if $multiple
 	then

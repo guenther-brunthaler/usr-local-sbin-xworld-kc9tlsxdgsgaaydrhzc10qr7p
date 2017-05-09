@@ -1,0 +1,32 @@
+#! /bin/sh
+# Use the TIME service on port $time_svc in order to obtain date/time from
+# $time_host and set the local system date/time to the received timestamp.
+# This script is basically a hand-crafted replacement for the "rdate" utility.
+set -e
+time_host=${1:?"Name or IP-address of host providing TIME service?"}
+time_svc=37
+trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
+if tool=`which socat 2> /dev/null` && test -x "$tool"
+then
+	read_tcp() {
+		"$tool" -u TCP:"$1:$2" STDOUT
+	}
+elif tool=`which nc 2> /dev/null` || tool=`which netcat 2> /dev/null` \
+	&& test -x "$tool"
+then
+	read_tcp() {
+		"$tool" "$1" "$2"
+	}
+else
+	echo "No supported utility for TCP reading found!" >& 2
+	false || exit
+fi
+
+xtime=`
+	read_tcp "$time_host" "$time_svc" \
+	| dd bs=4 count=1 2> /dev/null \
+	| od -tx1 -An | tr -dc [:xdigit:]
+`
+utime=`expr \`printf %u 0x$xtime\` - 2208988800`
+date -us @$utime > /dev/null
+date

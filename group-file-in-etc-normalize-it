@@ -1,0 +1,38 @@
+#! /bin/sh
+#
+# Sort the user groups file by GID like "grpck -s" does. However, also sort
+# the users in all groups lexicographically and remove duplicate entries. This
+# 'normalizes' the groups file, allowing more efficient comparisons of
+# different versions.
+#
+# Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
+#
+# This source file is free software.
+# Distribution is permitted under the terms of the GPLv3.
+
+subject=/etc/group
+
+set -e
+cleanup() {
+	rc=$?
+	test -n "$T" && rm -- "$T"
+	test $rc = 0 || echo "$0 failed!" >& 2
+}
+T=
+trap cleanup 0
+
+sort_users() {
+	sed 's/,/\n/g' | LC_COLLATE=C sort -u | paste -sd ,
+}
+
+wr() {
+	printf '%s\n' "$*"
+}
+
+T=`mktemp -- "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
+while IFS=: read -r grpname unused_pwck gid ulist
+do
+	wr "$grpname:$unused_pwck:$gid:`wr "$ulist" | sort_users`"
+done < "$subject" | sort -t : -nk 3,3 > "$T"
+cat "$T" > "$subject"
+wr "$subject has been sorted and normalized for comparisons!"

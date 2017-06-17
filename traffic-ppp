@@ -1,0 +1,58 @@
+#! /bin/sh
+# Add the sent/received bytes from the pppd syslog entries together for the
+# current day and show the traffic sum.
+#
+# This script assumes a syslog format starting using YYYY-MM-DD format as the
+# line prefix.
+#
+# If an argument is specified, it specifies an integral number of days and the
+# sum will be calculated instead for the date that many day before the current
+# day.
+#
+# Version 17.168
+# Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
+# 
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+set -e
+trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
+precise=false
+while getopts p opt
+do
+	case $opt in
+		p) precise=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+date=`date +%s`
+if test $# = 1
+then
+	expr x"$1" : x'[1-9][0-9]*$' > /dev/null
+	date=`expr $date - 60 \* 60 \* 24 \* $1`
+else
+	test $# = 0
+fi
+date=`date -d "@$date" +%Y-%m-%d`
+if $precise
+then
+	pid=`pidof pppd`
+	test "`echo "$pid" | tr ' ' '\n' | wc -l`" = 1
+	# Terminate the connection, adding the statistics for it to the
+	# syslog. In case of "persist" and "demand" connections, this will
+	# *not* reset the package counters or remove the interface
+	# temporarily.
+	kill -HUP $pid
+fi
+decimal_point=.
+eval `locale -k LC_NUMERIC | grep ^decimal_point=` 2> /dev/null || :
+logread | grep "^$date" | grep 'Sent.*received.*bytes' | sed '
+	s/\([0-9]*\) bytes/<<\1>>/g
+	s/[^<]*<<//
+	s/[^0-9]\{1,\}/\n/g
+' | sed '/^[^0-9]*$/d' | awk '
+	BEGIN {s= 0}
+	{s+= $0}
+	END {printf "%.2f MiB\n", s / 2 ^ 20}
+' | tr . "$decimal_point" | sed 's/^/'"$date: "'/'

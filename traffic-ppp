@@ -54,5 +54,19 @@ logread | grep "^$date" | grep 'Sent.*received.*bytes' | sed '
 ' | sed '/^[^0-9]*$/d' | awk '
 	BEGIN {s= 0}
 	{s+= $0}
-	END {printf "%.2f MiB\n", s / 2 ^ 20}
+	END {
+		split("K M G T P E Z Y", u)
+		for (i in u) u[i]= u[i] "iB"
+		u[i= 0]= "bytes"
+		while (s >= 1024 && i + 1 in u) {
+			++i; s/= 1024
+		}
+		split(sprintf("%.2f", s), v, "[.]")
+		v[3]= v[2] == 0 ? "" : v[2]
+		v[2]= v[3] == "" ? "" : "."
+		v[4]= " "; v[5]= u[i]
+		s= ""
+		for (i in v) s= s v[i]
+		print s
+	}
 ' | tr . "$decimal_point" | sed 's/^/'"$date: "'/'

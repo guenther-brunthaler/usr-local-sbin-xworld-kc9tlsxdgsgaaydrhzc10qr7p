@@ -9,7 +9,7 @@
 # sum will be calculated instead for the date that many day before the current
 # day.
 #
-# Version 17.168
+# Version 2017.168.1
 # Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
 # 
 # This script is free software.
@@ -17,9 +17,11 @@
 set -e
 trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
 precise=false
-while getopts p opt
+binary_units=0
+while getopts pb opt
 do
 	case $opt in
+		b) binary_units=1;;
 		p) precise=true;;
 		*) false || exit
 	esac
@@ -55,11 +57,12 @@ logread | grep "^$date" | grep 'Sent.*received.*bytes' | sed '
 	BEGIN {s= 0}
 	{s+= $0}
 	END {
-		split("K M G T P E Z Y", u)
-		for (i in u) u[i]= u[i] "iB"
+		bin= '"$binary_units"'
+		split((bin ? "K" : "k") " M G T P E Z Y", u)
+		for (i in u) u[i]= u[i] ((bin ? "i" : "") "B")
 		u[i= 0]= "bytes"
-		while (s >= 1024 && i + 1 in u) {
-			++i; s/= 1024
+		while (s >= (bin ? 1024 : 1000) && i + 1 in u) {
+			++i; s/= bin ? 1024 : 1000
 		}
 		split(sprintf("%.2f", s), v, "[.]")
 		v[3]= v[2] == 0 ? "" : v[2]

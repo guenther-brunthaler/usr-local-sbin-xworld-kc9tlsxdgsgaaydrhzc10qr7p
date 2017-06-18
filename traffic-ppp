@@ -14,15 +14,15 @@
 # 
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
+modem_ifc=ppp0
+
 set -e
 trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
-precise=false
 binary_units=0
 while getopts pb opt
 do
 	case $opt in
 		b) binary_units=1;;
-		p) precise=true;;
 		*) false || exit
 	esac
 done
@@ -31,29 +31,26 @@ shift `expr $OPTIND - 1 || :`
 date=`date +%s`
 if test $# = 1
 then
-	expr x"$1" : x'[1-9][0-9]*$' > /dev/null
+	expr x"$1" : x'[1-9][0-9]*$' \| x"$1" : x0 > /dev/null
 	date=`expr $date - 60 \* 60 \* 24 \* $1`
+	historic=true
 else
 	test $# = 0
+	historic=false
 fi
 date=`date -d "@$date" +%Y-%m-%d`
-if $precise
-then
-	pid=`pidof pppd`
-	test "`echo "$pid" | tr ' ' '\n' | wc -l`" = 1
-	# Terminate the connection, adding the statistics for it to the
-	# syslog. In case of "persist" and "demand" connections, this will
-	# *not* reset the package counters or remove the interface
-	# temporarily.
-	kill -HUP $pid
-fi
 decimal_point=.
 eval `locale -k LC_NUMERIC | grep ^decimal_point=` 2> /dev/null || :
-logread | grep "^$date" | grep 'Sent.*received.*bytes' | sed '
-	s/\([0-9]*\) bytes/<<\1>>/g
-	s/[^<]*<<//
-	s/[^0-9]\{1,\}/\n/g
-' | sed '/^[^0-9]*$/d' | awk '
+{
+	logread | grep "^$date" | grep 'Sent.*received.*bytes' | sed '
+		s/\([0-9]*\) bytes/<<\1>>/g
+		s/[^<]*<<//
+		s/[^0-9]\{1,\}/\n/g
+	'
+	$historic && exit
+	p='X bytes[^0-9]*\([0-9]\{1,\}\)[^0-9].*'
+	LC_ALL=C ifconfig "$modem_ifc" | sed 's/.*R'"$p"'T'"$p"'/\1 \2/; t; d'
+} | sed '/^[^0-9]*$/d' | awk '
 	BEGIN {s= 0}
 	{s+= $0}
 	END {

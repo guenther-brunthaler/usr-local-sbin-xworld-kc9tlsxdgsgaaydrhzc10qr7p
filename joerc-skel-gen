@@ -2,9 +2,11 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2016.34
-# Written in 2008 - 2016 by Guenther Brunthaler.
-
+# Version 2017.212
+# Copyright (c) 2007-2017 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
 
 # First, some general comments on the "joe" syntax detection feature.
 #

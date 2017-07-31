@@ -48,8 +48,13 @@ eval `locale -k LC_NUMERIC | grep ^decimal_point=` 2> /dev/null || :
 		s/[^0-9]\{1,\}/\n/g
 	'
 	$historic && exit
-	p='X bytes[^0-9]*\([0-9]\{1,\}\)[^0-9].*'
-	LC_ALL=C ifconfig "$modem_ifc" | sed 's/.*R'"$p"'T'"$p"'/\1 \2/; t; d'
+	p1='X bytes[^0-9]*\([0-9]\{1,\}\)[^0-9].*'
+	p2='^[[:space:]]*[RT]X packets.* bytes \([0-9]\{1,\}\)[^0-9].*'
+	LC_ALL=C ifconfig "$modem_ifc" | sed '
+		s/.*R'"$p1"'T'"$p1"'/\1 \2/; t
+		s/'"$p2"'/\1/; t
+		d
+	'
 } | sed '/^[^0-9]*$/d' | awk '
 	BEGIN {s= 0}
 	{s+= $0}

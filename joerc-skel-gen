@@ -2,13 +2,13 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2017.212
+# Version 2017.214
 # Copyright (c) 2007-2017 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
 
-# First, some general comments on the "joe" syntax detection feature.
+# First, some general comments on the "joe" file type detection feature.
 #
 # In order to make block of settings depending on a file type, two sorts of
 # conditions are supported.
@@ -34,8 +34,8 @@
 #
 # "begin\+\[A-Za-z# .,:\n]end".
 #
-# Of those types of conditions, the first type is mandatory for a new block
-# of statements - even if it is just "*".
+# Of those two types of conditions, the first type is mandatory for a new
+# block of statements - even if it is just "*".
 #
 # More conditions can follow the first condition of a new block of
 # statements.
@@ -119,11 +119,12 @@ my $USER_VALA= << "." . $USER_autoprog_x
 . << "." . $USER_autoprog_x
    *.gs
 .
-. << "." . $USER_autoprog_x . $USER_SIMPLICITY;
+. << "." . $USER_autoprog_x;
    *.vapi
 .
 my $USER_TCL= << ".";
    -autoindent
+   -title
    -syntax tcl
 .
 $USER_TCL= << "."
@@ -143,25 +144,13 @@ $USER_TCL= << "."
    }
    $out;
 };
-my $USER_RUST= << "." . $USER_autoprog_x;
-   \40
-    Rust source file
-   *.rs
-.
-my $USER_SCALA= << "." . $USER_autoprog_x;
-   \40
-    Scala source file
-   *.scala
-.
 my $USER_NEWSTUFF= << "EOF"
    \40
     Completely new entries.
    \40
 EOF
-   . $USER_TCL 
    . $USER_VALA
-   . $USER_RUST
-   . $USER_SCALA
+   . $USER_SIMPLICITY
 ;
 my $USER_RUBY= << "." . $USER_prog_x;
    +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
@@ -330,13 +319,15 @@ my @changes= (
    , {trigger => [qw/*.f *.for *.FOR/], add => $USER_prog}
    , {trigger => [qw/*.y/], add => $USER_prog}
    , {trigger => [qw/*.l/], add => $USER_prog}
-   , {trigger => [qw/*.tcl/], add => $USER_prog_x}
+   , {trigger => [qw/*.tcl/], add => $USER_TCL}
    , {trigger => [qw/*.sql/], add => $USER_prog}
    , {trigger => [qw/*.xml/], add => $USER_pnowrap}
    , {trigger => [qw/*.xsd/], add => $USER_pnowrap}
    , {trigger => [qw/*.htm *.html/], add => $USER_pnowrap}
    , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
    , {trigger => "*.rb", add => $USER_RUBY}
+   , {trigger => "*.rs", add => $USER_prog}
+   , {trigger => "*.scala", add => $USER_prog}
 );
 
 

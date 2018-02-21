@@ -132,7 +132,7 @@ process() {
 	esac
 	if test "$interactive_default_yes"
 	then
-		$interactive_default_yes && dp='Yn' || dp='yN'
+		$interactive_default_yes && dp='Ynq' || dp='yNq'
 		printf %s "Do you want to fsck $desc of type $TYPE [$dp]? "
 		local REPLY
 		REPLY=
@@ -140,6 +140,11 @@ process() {
 		case $REPLY in
 			[Yy]*) REPLY=true;;
 			[Nn]*) REPLY=false;;
+			[Qq]*)
+				echo "Quitting prematurely" \
+					"due to user request."
+				exit
+				;;
 			*) REPLY=$interactive_default_yes
 		esac
 		$REPLY || {

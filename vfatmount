@@ -2,7 +2,7 @@
 # Mount a VFAT volume using appropriate options.
 
 
-MOPT_VFAT_BASE="utf8=true,uid=operator,gid=plugdev"
+MOPT_VFAT_BASE="utf8=true,uid=root,gid=plugdev"
 MOPT_VFAT_RW="umask=117,dmask=007"
 MOPT_VFAT_RO="ro,umask=337,dmask=227"
 
@@ -38,8 +38,8 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 10.124
-	Copyright (c) 2007-2010 Guenther Brunthaler. All rights reserved.
+	Version 2018.207
+	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.

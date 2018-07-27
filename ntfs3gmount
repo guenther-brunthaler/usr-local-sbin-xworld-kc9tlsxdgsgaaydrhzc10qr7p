@@ -3,7 +3,7 @@
 
 
 MOPT_NTFS3G_BASE="streams_interface=windows,silent"
-MOPT_NTFS3G_BASE="$MOPT_NTFS3G_BASE,uid=operator,gid=plugdev"
+MOPT_NTFS3G_BASE="$MOPT_NTFS3G_BASE,uid=root,gid=operator"
 MOPT_NTFS3G_RW="fmask=117,dmask=007"
 MOPT_NTFS3G_RO="ro,fmask=337,dmask=227"
 MTYPE_NTFS3G="ntfs-3g"
@@ -40,8 +40,8 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 10.124
-	Copyright (c) 2007-2010 Guenther Brunthaler. All rights reserved.
+	Version 2018.208
+	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.

@@ -2,7 +2,7 @@
 # Mount a DVD volume using appropriate options.
 
 
-MOPT_UDF=",iocharset=utf8,umask=227,uid=operator,gid=plugdev,ro"
+MOPT_UDF=",iocharset=utf8,umask=227,uid=root,gid=operator,ro"
 
 
 usage() {
@@ -35,8 +35,8 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 10.124
-	Copyright (c) 2007-2010 Guenther Brunthaler. All rights reserved.
+	Version 2018.208
+	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.

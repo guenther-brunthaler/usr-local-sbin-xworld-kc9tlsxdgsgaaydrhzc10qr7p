@@ -3,7 +3,7 @@
 
 
 MOUNT_BIN=mount.exfat-fuse
-MOPT_exFAT_BASE="uid=operator,gid=plugdev,noatime"
+MOPT_exFAT_BASE="uid=root,gid=operator,noatime"
 MOPT_exFAT_RW="umask=117,dmask=007"
 MOPT_exFAT_RO="ro,umask=337,dmask=227"
 
@@ -39,8 +39,8 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 12.248
-	Copyright (c) 2007-2012 Guenther Brunthaler. All rights reserved.
+	Version 2018.208
+	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.

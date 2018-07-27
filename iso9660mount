@@ -2,7 +2,7 @@
 # Mount a CDROM volume using appropriate options.
 
 
-MOPT_ISO9660="utf8,uid=operator,gid=plugdev,ro,mode=0550"
+MOPT_ISO9660="utf8,uid=root,gid=operator,ro,mode=0550"
 
 
 usage() {

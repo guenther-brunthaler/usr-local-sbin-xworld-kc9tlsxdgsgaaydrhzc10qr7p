@@ -3,7 +3,7 @@
 
 
 MOPT_VFAT_BASE="utf8=true,uid=root,gid=operator"
-MOPT_VFAT_RW="umask=117,dmask=007"
+MOPT_VFAT_RW="umask=117,dmask=007,noatime"
 MOPT_VFAT_RO="ro,umask=337,dmask=227"
 
 
@@ -38,7 +38,7 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 2018.207
+	Version 2018.208
 	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.

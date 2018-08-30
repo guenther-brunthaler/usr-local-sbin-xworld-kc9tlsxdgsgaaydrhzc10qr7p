@@ -282,7 +282,7 @@ my @changes= (
       , duplicate => [
            "*\n"
          . "+#![ \t]*[a-z/]+/env[ \t]+[a-z0-9/]+ocaml\\>\n"
-         , "*\n#+![ \t]+[a-z0-9/]+ocaml\\>"
+         , "*\n+#![ \t]+[a-z0-9/]+ocaml\\>"
       ]
       , add => $USER_OCAML_prog
    }
@@ -303,7 +303,7 @@ my @changes= (
       trigger => ["*.py", "+#![ \t]*[a-z/]+/python\\>"]
       , add  => $USER_prog
       , duplicate  => "*\n+#![ \t]*[a-z/]+/env[ \t]+python\\>"
-      , duplicate_append  => "*\n+#![ \t]*/bin/sh\\n\"\"\":\"\\n"
+      , duplicate_append  => "*\n+#![ \t]*/bin/sh\\n\"\"\":\"\\n.*\\<python"
    }
    , {
       trigger => "*.lua", add => $USER_prog

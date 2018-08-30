@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2017.214
-# Copyright (c) 2007-2017 Guenther Brunthaler. All rights reserved.
+# Version 2018.242
+# Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -229,6 +229,14 @@ my @changes= (
    #  Then, for each string in the duplicates, that buffer will be added,
    #  prefixed by an empty line followed by a line containing only the
    #  duplicate text.
+   #
+   # duplicate_append => $SINGLE_MULTILINE_STRING
+   # duplicate_append => $MULTIILINE_STRING_ARRAY
+   #
+   #  Same as "duplicate", except that the duplicated section will not be
+   #  added immediately after the current section, but rather at the end of
+   #  the file. Use this to move duplicated sections after all sections of the
+   #  original file (of the unmodified input template file).
      {trigger => ' -break_hardlinks', add => << '.'}
        This is exactly what we want: Break hard links, but not symlinks.
       -break_hardlinks
@@ -287,11 +295,11 @@ my @changes= (
    }
    , {trigger => [qw/*.php/], add => $USER_prog}
    , {
-      trigger => "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"
-      , duplicate  => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
+      trigger => ["*.py", "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"]
       , add  => $USER_prog
+      , duplicate  => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
+      , duplicate_append  => "*\n+#! /bin/sh\\n\"\"\":\"\\n"
    }
-   , {trigger => "*.py", add => $USER_prog}
    , {
       trigger => "*.lua", add => $USER_prog
       # Disable Lua syntax highlighing because it's severely broken.
@@ -327,11 +335,13 @@ my @changes= (
    , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
    , {trigger => "*.rb", add => $USER_RUBY}
    , {trigger => "*.rs", add => $USER_prog}
-   , {trigger => "*.scala", add => $USER_prog}
+   , {trigger => [qw/*.scala *.sc/], add => $USER_prog}
+   , {trigger => "*.jl", add => $USER_prog}
 );
 
 
 use strict;
+use Fcntl qw(SEEK_SET);
 
 
 # Regex catching any of the triggers.
@@ -364,7 +374,7 @@ foreach $c (@changes) {
       }
    }
    # Keys for values to be coerced into arrays of strings.
-   foreach $k (qw/trigger ftrigger duplicate/) {
+   foreach $k (qw/trigger ftrigger duplicate duplicate_append/) {
       unless (exists $c->{$k}) {$c->{$k}= []}
       elsif (!ref $c->{$k}) {$c->{$k}= [$c->{$k}]}
    }
@@ -423,10 +433,12 @@ foreach $c (@changes) {
          } : '$'
       >gex;
    }
-   if (@{$c->{duplicate}}) {
-      $c->{buffer}= '';
-      $c->{collecting}= 1;
-      rlcip $_ foreach @{$c->{duplicate}};
+   foreach $k (qw/duplicate duplicate_append/) {
+      if (@{$c->{$k}}) {
+         $c->{buffer}= '';
+         $c->{collecting}= 1;
+         rlcip $_ foreach @{$c->{$k}};
+      }
    }
    foreach $k (qw/add insert/) {
       $c->{$k} || next;
@@ -443,6 +455,7 @@ foreach my $joerc (@joerc_files) {
    open OUT, '>', $joerc->{modified_target}
       or die "Cannot create '$joerc->{modified_target}' output file: $!"
    ;
+   open TMP, "+>", undef or die "Cannot create temporary file: $!";
    $st= 0;
    while (defined($_= <IN>)) {
       if ($st == 0) {
@@ -481,8 +494,20 @@ foreach my $joerc (@joerc_files) {
                      . $c->{buffer} . $end_modification_tag
                   ;
                }
-               undef $_ foreach $c->{buffer}, $c->{collecting};
                $c->{duplicate}= [];
+            }
+            if (@{$c->{duplicate_append}}) {
+               die unless defined $c->{buffer};
+               foreach $k (@{$c->{duplicate_append}}) {
+                  print TMP
+                     $begin_modification_tag . "\n" . $k
+                     . $c->{buffer} . $end_modification_tag
+                  ;
+               }
+               $c->{duplicate_append}= [];
+            }
+            foreach (qw/buffer collecting/) {
+               undef $c->{$_} if exists $c->{$_};
             }
             $st= 0;
          } elsif ($c->{collecting}) {
@@ -497,6 +522,9 @@ foreach my $joerc (@joerc_files) {
       }
       print OUT $_;
    }
+   seek TMP, 0, SEEK_SET or die $!;
+   print OUT <TMP>;
+   close TMP or die "Cannot close temporary file: $!";
    close OUT or die "Cannot finish writing '$joerc->{modified_target}': $!";
    close IN or die $!;
 }

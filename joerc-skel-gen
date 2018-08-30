@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2017.214
-# Copyright (c) 2007-2017 Guenther Brunthaler. All rights reserved.
+# Version 2018.242
+# Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -26,13 +26,18 @@
 # expressions may include "\n", and will then match more than just the very
 # first line.
 #
+# Note that joe's regular expressions have changed with later versions. For
+# instance, now x\+ does what did \+x did previously. In the case of postfix
+# RE operators only, the '\' must be omitted in file-contents sniffing RE
+# patterns. The '\' must also be omitted for character class patterns.
+#
 # Also note that while joe's "\*" wildcard does not match a "\n", its "\+"
 # can. Unfortunately, set complement "\[^x]" does not include control
 # characters, and sets may not include nested sets or wildcards. Therefore,
 # one has to try something like this to match a multi-line range of text
 # starting with the substring "begin" and ending with the substring "end":
 #
-# "begin\+\[A-Za-z# .,:\n]end".
+# "begin[A-Za-z# .,:\n]+end".
 #
 # Of those two types of conditions, the first type is mandatory for a new
 # block of statements - even if it is just "*".
@@ -105,8 +110,8 @@ my $USER_SIMPLICITY= << "." . $USER_prog2_x;
    \40
     Simplicity source file
    *
-   +#!\\+\\[ \t]\\+\\[a-z/]/env simple\\>
-   +#!\\+\\[ \t]\\+\\[a-z/]/env sim\\>
+   +#![ \t]+[a-z/]+/env simple\\>
+   +#![ \t]+[a-z/]+/env sim\\>
 .
 my $USER_VALA= << "." . $USER_autoprog_x
    \40
@@ -136,10 +141,10 @@ $USER_TCL= << "."
 . do {
    my $out= '';
    my($ind)= $USER_TCL =~ /^(\s+)/;
-   my$pfx= "\\+\\[ \t]\\+\\[a-z/]";
-   foreach my $rx ("$pfx/", "$pfx\\n#\\*\\\\\\nexec ") {
+   my$pfx= "[ \t]+[a-z/]+";
+   foreach my $rx ("$pfx/", "$pfx\\n#\\*\\\\nexec ") {
       foreach my $tool (qw/tclsh wish expect/) {
-         $out.= "$ind*\n$ind+#!$rx$tool\\>\n" . $USER_TCL . $USER_prog_x;
+         $out.= "$ind\n*$ind#+!$rx$tool\\>\n" . $USER_TCL . $USER_prog_x;
       }
    }
    $out;
@@ -153,7 +158,7 @@ EOF
    . $USER_SIMPLICITY
 ;
 my $USER_RUBY= << "." . $USER_prog_x;
-   +#!\\+\\[ \t]\\+\\[a-z/]/env ruby\\>
+   +#![ \t]+[a-z/]+/env ruby\\>
 .
 my $USER_JavaScript= [map << "=" . $_, << "+", << "."];
    \40JavaScript / ECMAScript
@@ -161,7 +166,7 @@ my $USER_JavaScript= [map << "=" . $_, << "+", << "."];
    *.js
 +
    *
-   +#!\\+\\[ \t]\\+\\[a-z/]/env kjscmd\\>
+   +#![ \t]*[a-z/]+/env kjscmd\\>
 .
 # What to change.
 my @changes= (
@@ -229,6 +234,14 @@ my @changes= (
    #  Then, for each string in the duplicates, that buffer will be added,
    #  prefixed by an empty line followed by a line containing only the
    #  duplicate text.
+   #
+   # duplicate_append => $SINGLE_MULTILINE_STRING
+   # duplicate_append => $MULTIILINE_STRING_ARRAY
+   #
+   #  Same as "duplicate", except that the duplicated section will not be
+   #  added immediately after the current section, but rather at the end of
+   #  the file. Use this to move duplicated sections after all sections of the
+   #  original file (of the unmodified input template file).
      {trigger => ' -break_hardlinks', add => << '.'}
        This is exactly what we want: Break hard links, but not symlinks.
       -break_hardlinks
@@ -258,7 +271,7 @@ my @changes= (
 .
    , {
       trigger => [
-           "+#!\\+\\[ \t]\\+\\[a-z/]/perl\\>"
+           "+#![ \t]*[a-z/]+/perl\\>"
            , qw/*.pl *.pm/
       ], add => $USER_prog
    }
@@ -268,8 +281,8 @@ my @changes= (
       trigger => [qw/*.sml *.ml *.mli/]
       , duplicate => [
            "*\n"
-         . "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]\\+\\[a-z0-9/]ocaml\\>\n"
-         , "*\n+#!\\+\\[ \t]\\+\\[a-z0-9/]ocaml\\>"
+         . "+#![ \t]*[a-z/]+/env[ \t]+[a-z0-9/]+ocaml\\>\n"
+         , "*\n#+![ \t]+[a-z0-9/]+ocaml\\>"
       ]
       , add => $USER_OCAML_prog
    }
@@ -287,30 +300,30 @@ my @changes= (
    }
    , {trigger => [qw/*.php/], add => $USER_prog}
    , {
-      trigger => "+#!\\+\\[ \t]\\+\\[a-z/]/python\\>"
-      , duplicate  => "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]python\\>"
+      trigger => ["*.py", "+#![ \t]*[a-z/]+/python\\>"]
       , add  => $USER_prog
+      , duplicate  => "*\n+#![ \t]*[a-z/]+/env[ \t]+python\\>"
+      , duplicate_append  => "*\n+#![ \t]*/bin/sh\\n\"\"\":\"\\n"
    }
-   , {trigger => "*.py", add => $USER_prog}
    , {
       trigger => "*.lua", add => $USER_prog
       # Disable Lua syntax highlighing because it's severely broken.
       , add  => $USER_prog_x . "   -syntax none"
       , duplicate => [
-         "*\n+#!\\+\\[ \t]\\+\\[a-z/]/lua\\>"
-         , "*\n+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]lua\\>"
-         , "*\n+#!\\+\\[ 	]\\[a-z/]\\+\\[a-z/]\\n"
-         . "if\\+\\[ 	]false\\n"
-         . "\\+\\[ 	]then\\n\\+\\[ 	]--[=[\\n\\+\\[ 	]fi\\n"
-         . "\\+\\[ 	]exec\\+\\[ 	]lu\\[av]\\[0-9]\\+\\[0-9.-+_]\\>"
+         "*\n+#!+[ \t]+[a-z/]/lua\\>"
+         , "*\n+#!+[ \t]+[a-z/]/env+[ \t]lua\\>"
+         , "*\n+#!+[ 	][a-z/]+[a-z/]\\n"
+         . "if+[ 	]false\\n"
+         . "+[ 	]then\\n+[ 	]--[=[\\n+[ 	]fi\\n"
+         . "+[ 	]exec+[ 	]lu[av][0-9]+[0-9.-+_]\\>"
       ]
    }
    , {
       trigger => [qw/*.lisp *.lsp *.sch *.scm *.ss/]
       , duplicate => [
            "*\n"
-         . "+#!\\+\\[ \t]\\+\\[a-z/]/env\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>\n"
-         , "*\n+#!\\+\\[ \t]\\+\\[a-z0-9/]scheme\\>"
+         . "+#![ \t]*[a-z/]+/env[ \t]*[a-z0-9/]+scheme\\>\n"
+         , "*\n+#![ \t]*[a-z0-9/]+scheme\\>"
       ]
       , add => $USER_prog2_x
    }
@@ -327,11 +340,13 @@ my @changes= (
    , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
    , {trigger => "*.rb", add => $USER_RUBY}
    , {trigger => "*.rs", add => $USER_prog}
-   , {trigger => "*.scala", add => $USER_prog}
+   , {trigger => [qw/*.scala *.sc/], add => $USER_prog}
+   , {trigger => "*.jl", add => $USER_prog}
 );
 
 
 use strict;
+use Fcntl qw(SEEK_SET);
 
 
 # Regex catching any of the triggers.
@@ -364,7 +379,7 @@ foreach $c (@changes) {
       }
    }
    # Keys for values to be coerced into arrays of strings.
-   foreach $k (qw/trigger ftrigger duplicate/) {
+   foreach $k (qw/trigger ftrigger duplicate duplicate_append/) {
       unless (exists $c->{$k}) {$c->{$k}= []}
       elsif (!ref $c->{$k}) {$c->{$k}= [$c->{$k}]}
    }
@@ -423,10 +438,12 @@ foreach $c (@changes) {
          } : '$'
       >gex;
    }
-   if (@{$c->{duplicate}}) {
-      $c->{buffer}= '';
-      $c->{collecting}= 1;
-      rlcip $_ foreach @{$c->{duplicate}};
+   foreach $k (qw/duplicate duplicate_append/) {
+      if (@{$c->{$k}}) {
+         $c->{buffer}= '';
+         $c->{collecting}= 1;
+         rlcip $_ foreach @{$c->{$k}};
+      }
    }
    foreach $k (qw/add insert/) {
       $c->{$k} || next;
@@ -443,6 +460,7 @@ foreach my $joerc (@joerc_files) {
    open OUT, '>', $joerc->{modified_target}
       or die "Cannot create '$joerc->{modified_target}' output file: $!"
    ;
+   open TMP, "+>", undef or die "Cannot create temporary file: $!";
    $st= 0;
    while (defined($_= <IN>)) {
       if ($st == 0) {
@@ -481,8 +499,20 @@ foreach my $joerc (@joerc_files) {
                      . $c->{buffer} . $end_modification_tag
                   ;
                }
-               undef $_ foreach $c->{buffer}, $c->{collecting};
                $c->{duplicate}= [];
+            }
+            if (@{$c->{duplicate_append}}) {
+               die unless defined $c->{buffer};
+               foreach $k (@{$c->{duplicate_append}}) {
+                  print TMP
+                     $begin_modification_tag . "\n" . $k
+                     . $c->{buffer} . $end_modification_tag
+                  ;
+               }
+               $c->{duplicate_append}= [];
+            }
+            foreach (qw/buffer collecting/) {
+               undef $c->{$_} if exists $c->{$_};
             }
             $st= 0;
          } elsif ($c->{collecting}) {
@@ -497,6 +527,9 @@ foreach my $joerc (@joerc_files) {
       }
       print OUT $_;
    }
+   seek TMP, 0, SEEK_SET or die $!;
+   print OUT <TMP>;
+   close TMP or die "Cannot close temporary file: $!";
    close OUT or die "Cannot finish writing '$joerc->{modified_target}': $!";
    close IN or die $!;
 }

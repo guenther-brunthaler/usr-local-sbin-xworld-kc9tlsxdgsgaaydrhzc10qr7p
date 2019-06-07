@@ -1,22 +1,23 @@
 #! /bin/sh
 # Mount a exFAT volume using appropriate options.
 
-
 MOUNT_BIN=mount.exfat-fuse
-MOPT_exFAT_BASE="uid=root,gid=operator,noatime"
-MOPT_exFAT_RW="umask=117,dmask=007"
-MOPT_exFAT_RO="ro,umask=337,dmask=227"
-
+getgid() {
+	getent group "$1" | cut -d : -f 3
+}
+MOPT_exFAT_BASE="uid=0,gid=`getgid operator`,noatime"
+MOPT_exFAT_RW="fmask=117,dmask=007"
+MOPT_exFAT_RO="ro,fmask=337,dmask=227"
 
 usage() {
 	cat <<- "."
 	exfatmount - mount a exFAT volume using appropriate options
-	
+
 	Uses the correct options for setting umask, dmask,
 	character set translation, owner, group, etc.
 
 	Usage: exfatmount [ options ] <device> <mount_point_directory>
-	
+
 	<device>:
 	  The device or image file containg the volume data
 	  of the exFAT file system.
@@ -39,23 +40,21 @@ usage() {
 	  Can be used to specify additional mount options
 	  such "remount" which will not be used by default.
 
-	Version 2018.208
-	Copyright (c) 2007-2018 Guenther Brunthaler. All rights reserved.
+	Version 2019.158
+	Copyright (c) 2007-2019 Guenther Brunthaler. All rights reserved.
 
 	This script is free software.
 	Distribution is permitted under the terms of the GPLv3.
 .
 }
-                                                                                                                             
 
 die() {
 	{
 		echo "ERROR: $*"
 		echo "Use $0 --help for help."
 	} >& 2
-	exit 1
+	false || exit
 }
-                                                        
 
 # Start of command line processing.
 # Define presets.
@@ -66,14 +65,17 @@ MAKE_MP=0
 ADD_OPT=
 #
 COPTS=
-while true; do
-	if [ -z "$COPTS" ]; then
+while :
+do
+	if test -z "$COPTS"
+then
 		case "$1" in
 			-?*) COPTS="$1"; shift;;
 			*) break;;
 		esac
 	fi
-	if [ "${COPTS#--}" = "$COPTS" ]; then
+	if test "${COPTS#--}" = "$COPTS"
+	then
 		TAIL="${COPTS#-?}"; # Switch clustering.
 		COPT="${COPTS%$TAIL}"; COPTS="${TAIL:+-}$TAIL"
 	else
@@ -108,38 +110,56 @@ test $# = 0 || die "Unexpected excess arguments: $*"
 CPFX=
 test $DRY = 1 && CPFX=echo
 OPT="$MOPT_exFAT_BASE"
-if [ "$READ_ONLY" -ne 0 ]; then
+if test "$READ_ONLY" -ne 0
+then
 	OPT="$MOPT_exFAT_RO,$OPT"
 else
 	OPT="$MOPT_exFAT_RW,$OPT"
 fi
 OPT="$OPT${ADD_OPT:+,}$ADD_OPT"
-if [ ! -b "$DEVICE" ]; then
-	if [ -f "$DEVICE" ]; then
+if test ! -b "$DEVICE"
+then
+	if test -f "$DEVICE"
+	then
 		OPT="$OPT${OPT:+,}loop"
 	else
 		die "'$DEVICE' is neither an image file" \
 			" nor a block special device!"
 	fi
 fi
-if [ -e "$MOUNT_POINT" ]; then
-	if [ ! -d "$MOUNT_POINT" ]; then
+if test -e "$MOUNT_POINT"
+then
+	if test ! -d "$MOUNT_POINT"
+	then
 		die "Mount point '$MOUNT_POINT' is not a directory!"
 	fi
-elif [ "$MAKE_MP" -ne 0 ]; then
-	if ! $CPFX mkdir "$MOUNT_POINT"; then
+elif test "$MAKE_MP" -ne 0
+then
+	if $CPFX mkdir "$MOUNT_POINT"
+	then
+		:
+	else
 		die "Cannot create mount point directory '$MOUNT_POINT'!"
 	fi
-	if ! $CPFX chown nobody:nogroup "$MOUNT_POINT"; then
+	if $CPFX chown nobody:nogroup "$MOUNT_POINT"
+	then
+		:
+	else
 		die "Cannot set owner for mount point '$MOUNT_POINT'!"
 	fi
-	if ! $CPFX chmod 0 "$MOUNT_POINT"; then
+	if $CPFX chmod 0 "$MOUNT_POINT"
+	then
+		:
+	else
 		die "Cannot set permissions for mount point '$MOUNT_POINT'!"
 	fi
 else
 	die "Mount point '$MOUNT_POINT' does not exist!"
 fi
-if ! $CPFX "$MOUNT_BIN" -o "$OPT" "$DEVICE" "$MOUNT_POINT"; then
+if $CPFX "$MOUNT_BIN" -o "$OPT" "$DEVICE" "$MOUNT_POINT"
+then
+	:
+else
 	die "Could not mount '$DEVICE' as '$MOUNT_POINT'!"
 fi
-test -n "$VERBOSE" && echo "Successfully mounted!"
+test "$VERBOSE" && echo "Successfully mounted!"

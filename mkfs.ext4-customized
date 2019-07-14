@@ -1,14 +1,23 @@
 #! /bin/sh
+# Version 2019.194
+# Copyright (c) 2019 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
 set -e
-trap 'test $? = 0 || echo "$0 failed!" >& 2' 0
+trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
 JOURNAL=has_journal
 LABEL=
+UUID=
 SU_RESERVED=0
 BLKSZ=
 DISCARD=discard
-while getopts JL:m:b:D OPT
+dry_run=false
+while getopts nU:JL:m:b:D OPT
 do
 	case $OPT in
+		n) dry_run=true;;
+		U) UUID=$OPTARG;;
 		J) JOURNAL=^has_journal;;
 		L) LABEL=$OPTARG;;
 		m) SU_RESERVED=$OPTARG;;
@@ -23,14 +32,25 @@ test $# = 0
 test -n "$DEV"
 test -b "$DEV"
 test -n "$LABEL"
+
+run() {
+	local a
+	printf '%s:' `$dry_run && echo SIMULATION || echo RUNNING`
+	for a
+	do
+		printf " '%s'" "`echo "$a" | sed "s/'/'\\\\\\\\''/g"`"
+	done
+	echo
+	$dry_run && : || "$@"
+}
+
 {
 	set mkfs.ext4 -m"$SU_RESERVED" -O "^ext_attr,$JOURNAL" \
-		-L "$LABEL" -E "$DISCARD"
+		-L "$LABEL" ${UUID:+-U "$UUID"} -E "$DISCARD"
 	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
-	set -x
-	"$@" "$DEV"
-	tune2fs -o ^user_xattr,^acl -e remount-ro "$DEV"
-	fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
+	run "$@" "$DEV"
+	run tune2fs -o ^user_xattr,^acl -e remount-ro "$DEV"
+	run fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
 	echo "*** Success! ***"
-	tune2fs -l "$DEV"
-} 2>& 1 | less
+	run tune2fs -l "$DEV"
+} 2>& 1 | { $dry_run && cat || less; }

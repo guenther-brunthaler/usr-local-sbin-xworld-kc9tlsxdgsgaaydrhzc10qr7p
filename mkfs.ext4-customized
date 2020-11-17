@@ -1,11 +1,36 @@
 #! /bin/sh
-# Version 2019.194
-# Copyright (c) 2019 Guenther Brunthaler. All rights reserved.
-#
-# This script is free software.
-# Distribution is permitted under the terms of the GPLv3.
+exit_version() {
+	cat << '---'; exit
+Version 2020.322
+Copyright (c) 2019-2020 Guenther Brunthaler. All rights reserved.
+
+This script is free software.
+Distribution is permitted under the terms of the GPLv3.
+---
+}
 set -e
 trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
+
+exit_help() {
+	cat << ---; echo; exit_version
+$0 - customized mkfs.ext4 using different defaults
+
+$0 <options> <device>
+
+-L <name>: (MANDATORY) Specify the volume label.
+-n: Show what would be done, but don't actually do anything.
+-J: Disable journal, i. e. make it behave similar to ext2
+-m <reserved>: Specify percent (default 5) of space reserved for root.
+-U <uuid>: Specify specific UUID for volume.
+-b <blksz>: Specify a particular cluster size.
+-D: Disable the "discard" feature.
+-A) Support ACLs. Default: Don't.
+-X) Support extended attributes. Default: Don't.
+-h) Show this help and exit.
+-V) Show script version and exit.
+---
+}
+
 JOURNAL=has_journal
 LABEL=
 UUID=
@@ -13,7 +38,9 @@ SU_RESERVED=0
 BLKSZ=
 DISCARD=discard
 dry_run=false
-while getopts nU:JL:m:b:D OPT
+has_acls=false
+has_xattr=false
+while getopts nU:JL:m:b:DAXhV OPT
 do
 	case $OPT in
 		n) dry_run=true;;
@@ -23,6 +50,10 @@ do
 		m) SU_RESERVED=$OPTARG;;
 		b) BLKSZ=$OPTARG;;
 		D) DISCARD=nodiscard;;
+		A) has_acls=true;;
+		X) has_xattr=true;;
+		h) exit_help;;
+		V) exit_version;;
 		*) false
 	esac
 done
@@ -45,11 +76,14 @@ run() {
 }
 
 {
-	set mkfs.ext4 -m"$SU_RESERVED" -O "^ext_attr,$JOURNAL" \
+	opt=; $has_xattr || opt=^ext_attr
+	set mkfs.ext4 -m"$SU_RESERVED" -O "$opt${opt:+,}$JOURNAL" \
 		-L "$LABEL" ${UUID:+-U "$UUID"} -E "$DISCARD"
 	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
 	run "$@" "$DEV"
-	run tune2fs -o ^user_xattr,^acl -e remount-ro "$DEV"
+	opt=; $has_xattr || opt=^user_attr
+	$has_acls || opt=${opt:+,}^acl
+	run tune2fs ${opt:+-o $opt} -e remount-ro "$DEV"
 	run fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
 	echo "*** Success! ***"
 	run tune2fs -l "$DEV"

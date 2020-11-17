@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	cat << '---'; exit
-Version 2020.322
+Version 2020.322.1
 Copyright (c) 2019-2020 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
@@ -23,7 +23,7 @@ $0 <options> <device>
 -m <reserved>: Specify percent (default 5) of space reserved for root.
 -U <uuid>: Specify specific UUID for volume.
 -b <blksz>: Specify a particular cluster size.
--D: Disable the "discard" feature.
+-D: Disable the "discard" feature (enabled by default).
 -A) Support ACLs. Default: Don't.
 -X) Support extended attributes. Default: Don't.
 -h) Show this help and exit.
@@ -82,7 +82,7 @@ run() {
 	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
 	run "$@" "$DEV"
 	opt=; $has_xattr || opt=^user_attr
-	$has_acls || opt=${opt:+,}^acl
+	$has_acls || opt=$opt${opt:+,}^acl
 	run tune2fs ${opt:+-o $opt} -e remount-ro "$DEV"
 	run fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
 	echo "*** Success! ***"

@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	cat << '---'; exit
-Version 2020.322.1
+Version 2020.322.2
 Copyright (c) 2019-2020 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
@@ -81,7 +81,7 @@ run() {
 		-L "$LABEL" ${UUID:+-U "$UUID"} -E "$DISCARD"
 	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
 	run "$@" "$DEV"
-	opt=; $has_xattr || opt=^user_attr
+	opt=; $has_xattr || opt=^user_xattr
 	$has_acls || opt=$opt${opt:+,}^acl
 	run tune2fs ${opt:+-o $opt} -e remount-ro "$DEV"
 	run fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x

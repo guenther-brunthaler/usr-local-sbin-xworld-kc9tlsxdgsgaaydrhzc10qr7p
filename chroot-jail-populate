@@ -1,0 +1,117 @@
+#! /bin/sh
+# Copy all all binary executables (or shared libraries) specified as the
+# second and remaining command line arguments to the chroot jail directory
+# specified by the first argument. The destination directory and all the
+# specified files must exist. Option -d will delete the contents of the
+# destination directory before starting the copying, ensuring a fresh copy
+# with no unnecessary old files.
+#
+# Version 2020.349
+#
+# Copyright (c) 2020 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+
+set -e
+cleanup() {
+	rc=$?
+	test "$TD" && rm -r -- "$TD"
+	test $rc = 0 || echo "\"$0\" failed!" >& 2
+}
+trap cleanup 0
+TD=
+trap 'exit $?' TERM INT HUP QUIT
+
+delete=false
+while getopts d opt
+do
+	case $opt in
+		d) delete=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+d=$1; d=${d%%/}
+case $d in
+	/*) d=/${d##/};;
+	-*) d=./$d
+esac
+test -d "$d"; shift
+
+if $delete
+then
+	find -H "$d" -xdev -depth \
+		-path "$d" \
+		-o -type d -exec rmdir -- {} \; \
+		-o -exec rm -- {} \;
+fi
+
+TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
+
+write() {
+	print '%s\n' "$*"
+}
+
+export LC_COLLATE=C
+
+# Copy absolute file or symlink $f to rootjail at $d. If it is a symlink,
+# check whether the referenced target also exists, or copy that target as
+# well (recursively).
+#
+# Trashes: $f $t
+copy_over() {
+	while : 
+	do
+		t=$d/${f##/}
+		mkdir -p -- "`dirname -- "$t"`"
+		cp -Ppf -- "$f" "$t"
+		test ! -L "$f" && break
+		t=`readlink -- "$f"`
+		case $t in
+			/*) f=$t;;
+			*) f=`dirname -- "$f"`/$t
+		esac
+	done
+}
+
+cwd=`pwd`
+test -d "$cwd"
+{
+	for f
+	do
+		case $f in
+			/*) ;;
+			*) f=$cwd/$f
+		esac
+		test -f "$f" || test -L "$f" || exit
+		copy_over
+	done
+}
+
+
+find -H "$d" -xdev -type f -exec file -i -- {} + \
+| awk -f /dev/fd/5 5<< 'EOF' > "$TD"/check
+	$2 ~ "^application/.*(executable|sharedlib)" {
+		print substr($1, 1, length($1) - 1)
+	}
+EOF
+
+> "$TD"/checked
+while test -s "$TD"/check
+do
+	while IFS= read -r f
+	do
+		ldd "$f" 2> /dev/null
+	done < "$TD"/check \
+	| awk '{$0= NF == 2 ? $1 : $3} $0 ~ "^/" {print}' | sort -u \
+	| tee -- "$TD"/check_also \
+	| while IFS= read -r f
+	do
+		copy_over
+	done
+	sort -u -o "$TD"/checked -- "$TD"/checked "$TD"/check
+	comm -23 -- "$TD"/check_also "$TD"/checked > "$TD"/check
+done
+echo 'Success!'

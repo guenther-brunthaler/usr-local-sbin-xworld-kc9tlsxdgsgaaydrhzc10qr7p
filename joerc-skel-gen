@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2019.45
-# Copyright (c) 2007-2019 Guenther Brunthaler. All rights reserved.
+# Version 2020.349
+# Copyright (c) 2007-2020 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -94,10 +94,13 @@ my $USER_prog_x= << '.' . $USER_prog;
 my $USER_prog2_x= << '.' . $USER_prog2;
    -tab 2
 .
-my $USER_autoprog_x= << '.' . $USER_prog_x;
+my $USER_autoprog= << '.';
    -autoindent
    -smartbacks
    -smarthome
+.
+my $USER_autoprog_x= << "." . $USER_prog_x;
+   $USER_autoprog
 .
 my $USER_OCAML_prog= << '.' . $USER_prog2_x;
    -syntax ocaml
@@ -337,12 +340,11 @@ my @changes= (
    , {trigger => [qw/*.xml/], add => $USER_pnowrap}
    , {trigger => [qw/*.xsd/], add => $USER_pnowrap}
    , {trigger => [qw/*.htm *.html/], add => $USER_pnowrap}
-   , {trigger => "*jpicorc.in", add => $USER_NEWSTUFF}
-   , {trigger => "*.rb", add => $USER_RUBY}
-   , {trigger => "*.rs", add => $USER_prog}
-   , {trigger => [qw/*.scala *.sc/], add => $USER_prog}
-   , {trigger => "*.jl", add => $USER_prog}
-   , {trigger => "*.go", add => << '.'}
+   , {trigger => '*jpicorc.in', add => $USER_NEWSTUFF}
+   , {trigger => '*.rb', add => $USER_RUBY}
+   , {trigger => '*.rs', add => $USER_prog}
+   , {trigger => '*.scala', add => $USER_prog2_x}
+   , {trigger => '*.go', add => << '.'}
       -indentc 9
       -istep 1
       -tab 4

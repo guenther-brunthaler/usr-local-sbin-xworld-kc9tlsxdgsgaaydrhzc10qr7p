@@ -1,8 +1,8 @@
 #! /bin/sh
 exit_version() {
 	cat << '---'; exit
-Version 2020.323
-Copyright (c) 2019-2020 Guenther Brunthaler. All rights reserved.
+Version 2021.55
+Copyright (c) 2019-2021 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
 Distribution is permitted under the terms of the GPLv3.
@@ -67,7 +67,11 @@ shift `expr $OPTIND - 1 || :`
 DEV=$1; shift
 test $# = 0
 test -n "$DEV"
-test -b "$DEV"
+if test ! -b "$DEV"
+then
+	test -f "$DEV"
+	test -s "$DEV"
+fi
 test -n "$LABEL"
 
 run() {

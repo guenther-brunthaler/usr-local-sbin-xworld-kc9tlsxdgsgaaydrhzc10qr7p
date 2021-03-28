@@ -1,0 +1,65 @@
+#! /bin/sh
+exit_version() {
+	cat << ===; exit
+Version 2021.87
+Copyright (c) 2021 Guenther Brunthaler. All rights reserved.
+
+This script is free software.
+Distribution is permitted under the terms of the GPLv3.
+===
+}
+APP=${0##*/}
+
+exit_help() {
+	cat << ===; echo; exit_version
+$APP - derive a numeric UID/GID from user/group name
+
+Usage: $APP [ <options> ] <name>
+
+where <name> is a user or group name.
+
+options:
+-h: Show this help and exit.
+-V: Show script version and exit.
+
+The derivation works as follows: The MD5 digest of <name> is
+interpreted as a hexadecimal number and is mapped into the
+numeric range from 10'000 (inclusive) to 60'000 (exclusive).
+===
+}
+
+set -e
+trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
+
+while getopts hV opt
+do
+	case $opt in
+		h) exit_help;;
+		V) exit_version;;
+		*) false
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+if command -v md5sum > /dev/null 2>& 1
+then
+	h() {
+		printf %s "$1" | md5sum -b | cut -d ' ' -f 1 | tr a-f A-F
+	}
+elif command -v openssl > /dev/null 2>& 1
+then
+	h() {
+		printf %s "$1" | openssl md5 | cut -d ' ' -f 2 | tr a-f A-F
+	}
+else
+	echo "md5sum or openssl required!" >& 2
+	false || exit
+fi
+case $# in
+	1) ;;
+	*)
+		echo "Incorrect number of arguments!"
+		echo "(Option -h shows help.)"
+		false || exit
+esac >& 2
+echo "ibase=16; h=`h "$1"`; ibase=A; 10000 + h % 50000" | bc

@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2020.349
-# Copyright (c) 2007-2020 Guenther Brunthaler. All rights reserved.
+# Version 2022.4
+# Copyright (c) 2007-2022 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -261,6 +261,11 @@ my @changes= (
    , {trigger => "*", add => << "."}
        What a braindead idea! Try word-wrapping a configuration file, for
        instance...
+      $USER_nowrap
+.
+   , {trigger => "[not_text]", add => << "."}
+       This seems clearly to be a bug: '-wordwrap' actually enables word wrap!
+       Override and disable it.
       $USER_nowrap
 .
    , {trigger => ['-istep 2', '-istep 4'], add => << '.'}

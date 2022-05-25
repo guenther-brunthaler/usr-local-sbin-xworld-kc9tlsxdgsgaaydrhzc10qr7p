@@ -6,9 +6,9 @@
 # destination directory before starting the copying, ensuring a fresh copy
 # with no unnecessary old files.
 #
-# Version 2020.349
+# Version 2022.145
 #
-# Copyright (c) 2020 Guenther Brunthaler. All rights reserved.
+# Copyright (c) 2020-2022 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -39,6 +39,22 @@ case $d in
 	-*) d=./$d
 esac
 test -d "$d"; shift
+
+n=$#
+while test $n != 0
+do
+	if test -f "$1"
+	then
+		set -- "$@" "$1"
+	else
+		expr x"$1" : x'.*/' = 0 > /dev/null
+		c=`command -v -- "$1"`
+		test -f "$c"
+		set -- "$@" "$c"
+	fi
+	shift
+	n=`expr $n - 1 || :`
+done
 
 if $delete
 then
@@ -103,7 +119,7 @@ while test -s "$TD"/check
 do
 	while IFS= read -r f
 	do
-		ldd "$f" 2> /dev/null
+		ldd "$f" 2> /dev/null || :
 	done < "$TD"/check \
 	| awk '{$0= NF == 2 ? $1 : $3} $0 ~ "^/" {print}' | sort -u \
 	| tee -- "$TD"/check_also \

@@ -2,8 +2,8 @@
 #
 # A synthesizer for customized $HOME/.joe files.
 #
-# Version 2022.4
-# Copyright (c) 2007-2022 Guenther Brunthaler. All rights reserved.
+# Version 2023.27
+# Copyright (c) 2007-2023 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -81,6 +81,11 @@ $ENV{NULL}= "";
 my $USER_prog= << '.';
    -indentc 32
    -istep 3
+   -spaces
+.
+my $USER_prog4= << '.';
+   -indentc 32
+   -istep 4
    -spaces
 .
 my $USER_prog2= << '.';
@@ -309,7 +314,7 @@ my @changes= (
    , {trigger => [qw/*.php/], add => $USER_prog}
    , {
       trigger => ["*.py", "+#![ \t]*[a-z/]+/python\\>"]
-      , add  => $USER_prog
+      , add  => $USER_prog4
       , duplicate  => "*\n+#![ \t]*[a-z/]+/env[ \t]+python\\>"
       , duplicate_append  => "*\n+#![ \t]*/bin/sh\\n\"\"\":\"\\n.*\\<python"
    }

@@ -1,37 +1,27 @@
 #! /bin/sh
-{
-	src=/sys/class/thermal/thermal_zone0/temp
-	if test -f "$src"
-	then
-		echo CPU `awk '{printf "%.1f\n", $1 / 1e3}' "$src"`
-	fi
-	src=/opt/vc/bin/vcgencmd
-	if test -x "$src"
-	then
-		echo GPU `"$src" measure_temp | tr -cd '0-9.'`
-	fi
-} | sort -k2nr | awk '
-	BEGIN {n= 0}
 
-	{l[n]= $1; t[n++]= $2}
+# v2024.210
+eval `locale -k LC_NUMERIC | grep ^decimal_point= || echo decimal_point=.`
+degree_celsius=`
+	echo +ALA-C | iconv -f UTF-7 2> /dev/null \
+	|| echo degree Celsius
+`
 
-	END {
-		if (n == 0) {
-			print "(No supported temperature sources.)" \
-				> "/dev/stderr"
-		}
-		else {
-			last= t[0];
-			for (i= 1; i < n; ++i) {
-				if (t[i] != last) {
-					last= ""
-					break
-				}
-			}
-			if (last != "") print last
-			else {
-				for (i= 0; i < n; ++i) print l[i] " " t[i]
-			}
-		}
-	}
-'
+get_measurements() {
+	grep -s . /sys/class/thermal/thermal_zone[0-9]*/temp \
+	| awk -F: '{printf "%.1f\n", $NF / 1e3}'
+	if
+		vcg=`PATH=$PATH:/opt/vc/bin command -c vcgencmd 2> /dev/null` \
+		&& test -x "$vcg"
+	then
+		LC_ALL=C "$vcg" | sed 's/[^-.0-9].*//'
+	fi
+}
+
+echo "`
+	get_measurements \
+	| sed 's/\.0$//' \
+	| tr . "$decimal_point" \
+	| sort -nr \
+	| head -n 1
+` $degree_celsius"

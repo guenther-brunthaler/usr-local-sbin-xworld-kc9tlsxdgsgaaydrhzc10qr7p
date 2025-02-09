@@ -1,0 +1,55 @@
+#! /bin/sh
+
+# Specify the path to a kernel's modules top-level directory, extracts the
+# compressed kernel configuration from there and prints it to standard output.
+# Defaults to the module's directory for the currently running kernel.
+#
+# Version 2025.40
+# Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+
+set -e
+cleanup() {
+	rc=$?
+	test "$TD" && rm -rf -- "$TD"
+	test $rc = 0 || echo "\"$0\" failed!" >& 2
+}
+TD=
+trap cleanup 0
+trap 'exit $?' HUP INT TERM QUIT
+
+while getopts '' opt
+do
+	case $opt in
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`
+
+test $# = 0 && set /lib/modules/"`uname -r`"
+test $# = 1
+
+md=$1
+while :
+do
+	f=`ls -- "$md/kernel/kernel/configs.ko"* 2> /dev/null` \
+	&& test -f "$f" && break
+	md=`dirname -- "$md"`
+	test "$md" != /
+done
+case $f in
+	*.gz) zcat -- "$f";;
+	*.xz) xzcat -- "$f";;
+	*.ko) cat -- "$f";;
+	*) false || exit
+esac > "$TD"/config.ko
+
+objdump -j .rodata -s -- "$TD"/config.ko \
+| sed '/^Cont/,$!d; /^Cont/d; s/ [^ ]*//; s/  .*//' \
+| diffprep -X \
+| { dd bs=8 count=1 of=/dev/null 2> /dev/null; cat; } \
+| zcat 2> /dev/null || test $? = 2

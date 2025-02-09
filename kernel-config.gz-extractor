@@ -48,8 +48,18 @@ case $f in
 	*) false || exit
 esac > "$TD"/config.ko
 
-objdump -j .rodata -s -- "$TD"/config.ko \
-| sed '/^Cont/,$!d; /^Cont/d; s/ [^ ]*//; s/  .*//' \
+dir=`command -v -- objdump`
+dir=`dirname -- "$dir"` 
+set -- objdump `ls -- "$dir"/*-objdump`
+while :
+do
+	test "$1" || exit
+	"$1" -j .rodata -s -- "$TD"/config.ko 2> /dev/null > "$TD"/dump \
+		&& break
+	shift
+done
+
+sed '/^Cont/,$!d; /^Cont/d; s/ [^ ]*//; s/  .*//' "$TD"/dump \
 | diffprep -X \
 | { dd bs=8 count=1 of=/dev/null 2> /dev/null; cat; } \
 | zcat 2> /dev/null || test $? = 2

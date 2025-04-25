@@ -1,0 +1,89 @@
+#! /bin/sh
+
+# Generate pronouncable 7-letter hostname from the MAC address or a random
+# hostname if no Wi-Fi or Ethernet hardware is present.
+
+set -e
+trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
+
+while getopts '' opt
+do
+	case $opt in
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+warn() {
+	printf '%s\n' "$*" >& 2
+	warned=true
+}
+warned=false
+
+PATH=/usr/local/sbin:/usr/sbin:/sbin:/opt/sbin:$PATH
+c=proquint u=jv3gwuidf2ezyr5vbqavqtxyh
+if command -v $c > /dev/null
+then
+	:
+else
+	warn "Utility '$c' from git branch with UUID $u" \
+		'is required in some directory in $PATH!'
+fi
+for c in openssl ip
+do
+	if command -v $c > /dev/null
+	then
+		:
+	else
+		warn "Utility '$c' needs to be installed!"
+	fi
+done
+if $warned
+then
+	false || exit
+fi
+
+ip addr | {
+	pri= best=
+	while read w1 w2 rest
+	do
+		case $w1 in
+			[1-9]*)
+				if
+					expr \
+						x"$w1" : x'[1-9][0-9]*:$' \
+						\& x"$w2" : x'.*:$' \
+					> /dev/null
+				then
+					ifc=${w2%:}
+					case $ifc in
+						ethernet) pri=0;;
+						ethernet[0-9]*) pri=-1;;
+						eth[0-9]*) pri=-2;;
+						en*) pri=-3;;
+						wifi) pri=-4;;
+						wifi[0-9]*) pri=-5;;
+						wlan[0-9]*) pri=-6;;
+						wl*) pri=-7;;
+						*) pri=-8
+					esac
+				fi
+				;;
+			link/ether)
+				test -z "$pri" && continue
+				if test -z "$best" || test $pri -gt $best
+				then
+					mac=$w2 best=$pri
+				fi
+				pri=
+		esac
+	done
+	if test "$best"
+	then
+		printf '%s' "$mac" \
+		| openssl sha256 -binary \
+		| dd bs=3 count=1 2> /dev/null
+	else
+		dd if=/dev/random bs=1 count=3 2> /dev/null
+	fi
+} | proquint 7

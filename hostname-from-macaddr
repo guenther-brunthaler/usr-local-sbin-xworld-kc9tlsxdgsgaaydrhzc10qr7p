@@ -1,7 +1,15 @@
 #! /bin/sh
 
 # Generate pronouncable 7-letter hostname from the MAC address or a random
-# hostname if no Wi-Fi or Ethernet hardware is present.
+# hostname if no Wi-Fi or Ethernet hardware is present. Alternatively, a
+# MAC address can be specified as the only argument, which will then be the
+# only source of the displayed hostname.
+#
+# Version 2025.115
+# Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
 
 set -e
 trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
@@ -14,11 +22,23 @@ do
 done
 shift `expr $OPTIND - 1 || :`
 
+
 warn() {
 	printf '%s\n' "$*" >& 2
 	warned=true
 }
 warned=false
+
+mac=
+case $# in
+	0) ;;
+	1)
+		o='[0-9a-f]\{2\}' # MAC octet.
+		expr x"$1" : x'\('"$o"':\)\{5\}'"$o"'$' > /dev/null
+		mac=$1
+		;;
+	*) false || exit
+esac
 
 PATH=/usr/local/sbin:/usr/sbin:/sbin:/opt/sbin:$PATH
 c=proquint u=jv3gwuidf2ezyr5vbqavqtxyh
@@ -43,7 +63,7 @@ then
 	false || exit
 fi
 
-ip addr | {
+extract_mac() {
 	pri= best=
 	while read w1 w2 rest
 	do
@@ -80,10 +100,18 @@ ip addr | {
 	done
 	if test "$best"
 	then
-		printf '%s' "$mac" \
-		| openssl sha256 -binary \
-		| dd bs=3 count=1 2> /dev/null
-	else
-		dd if=/dev/random bs=1 count=3 2> /dev/null
+		printf '%s\n' "$mac"
 	fi
-} | proquint 7
+}
+
+if
+	test "$mac" || {
+		mac=`LC_ALL=C ip addr | extract_mac` && test "$mac"
+	}
+then
+	printf '%s' "$mac" | openssl sha256 -binary \
+	| dd bs=3 count=1 2> /dev/null
+else
+	dd if=/dev/random bs=1 count=3 2> /dev/null
+fi \
+| proquint 7

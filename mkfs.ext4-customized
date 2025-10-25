@@ -1,8 +1,8 @@
 #! /bin/sh
 exit_version() {
 	cat << '---'; exit
-Version 2021.55
-Copyright (c) 2019-2021 Guenther Brunthaler. All rights reserved.
+Version 2025.298
+Copyright (c) 2019-2025 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
 Distribution is permitted under the terms of the GPLv3.
@@ -22,7 +22,8 @@ $0 <options> <device>
 -J: Disable journal, i. e. make it behave similar to ext2
 -m <reserved>: Specify percent (default 5) of space reserved for root.
 -U <uuid>: Specify specific UUID for volume.
--b <blksz>: Specify a particular cluster size.
+-b <blksz>: Specify a particular block size.
+-C <clustersz>: Specify a particular cluster size.
 -D: Disable the "discard" feature (enabled by default).
 -A) Support ACLs. Default: Don't.
 -X) Support extended attributes. Default: Don't.
@@ -38,13 +39,14 @@ LABEL=
 UUID=
 SU_RESERVED=0
 BLKSZ=
+CLSZ=
 DISCARD=discard
 dry_run=false
 has_acls=false
 has_xattr=false
 atime= #noatime
 readonly=false
-while getopts nU:JL:m:b:DAXhV:`: ar` OPT
+while getopts nC:U:JL:m:b:DAXhV:`: ar` OPT
 do
 	case $OPT in
 		n) dry_run=true;;
@@ -53,6 +55,7 @@ do
 		L) LABEL=$OPTARG;;
 		m) SU_RESERVED=$OPTARG;;
 		b) BLKSZ=$OPTARG;;
+		C) CLSSZ=$OPTARG;;
 		D) DISCARD=nodiscard;;
 		A) has_acls=true;;
 		X) has_xattr=true;;
@@ -79,17 +82,22 @@ run() {
 	printf '%s:' `$dry_run && echo SIMULATION || echo RUNNING`
 	for a
 	do
-		printf " '%s'" "`echo "$a" | sed "s/'/'\\\\\\\\''/g"`"
+		printf " '%s'" "`printf '%s\n' "$a" \
+			| sed "s/'/'\\\\\\\\''/g"`"
 	done
 	echo
 	$dry_run && : || "$@"
 }
 
 {
-	opt=; $has_xattr || opt=^ext_attr
-	set mkfs.ext4 -m"$SU_RESERVED" -O "$opt${opt:+,}$JOURNAL" \
+	opt=
+	$has_xattr || opt=$opt${opt:+,}^ext_attr
+	test "$CLSZ" && opt=$opt${opt:+,}bigalloc
+	opt=$opt${opt:+,}$JOURNAL
+	set mkfs.ext4 -m"$SU_RESERVED" -O "$opt" \
 		-L "$LABEL" ${UUID:+-U "$UUID"} -E "$DISCARD"
 	test -n "$BLKSZ" && set "$@" -b"$BLKSZ"
+	test -n "$CLSZ" && set "$@" -C"$BLKSZ"
 	run "$@" "$DEV"
 	opt=; $has_xattr || opt=^user_xattr
 	$has_acls || opt=$opt${opt:+,}^acl

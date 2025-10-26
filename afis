@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	wr << =====; exit
-$APP version 2025.299.1
+$APP version 2025.299.2
 Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
 =====
 }
@@ -369,7 +369,7 @@ write_signature() {
 	printf '%-32s' OK
 }
 
-format_avis() {
+format_afis() {
 	test ! -e "$1/$stripe_subdir"
 	test ! -e "$1/$slot_subdir"
 	mkdir -m 700 -- "$1/$stripe_subdir" "$1/$slot_subdir"
@@ -417,12 +417,14 @@ format_avis() {
 	unwind
 }
 
-verify_avis_dir() {
+verify_afis_dir() {
 	test -d "$1/$stripe_subdir"
 	test -d "$1/$slot_subdir"
 }
 
-reconstruct_avis() {
+# XOR the stripes below base directory $1 together and write them to
+# standard output.
+reconstruct_afis() {
 	scope
 		var i spn
 		i=0
@@ -442,6 +444,63 @@ reconstruct_avis() {
 		done
 		cat -- "$TD"/comb
 	unwind
+}
+
+# Read $1 bytes from standard input and save it to file $2.
+read_rest() {
+	scope
+		var blksz left2read numblks
+		blksz=`expr 64 \* 1024` left2read=$1
+		{
+			if numblks=`expr $left2read / $blksz`
+			then
+				dd bs=$blksz count=$numblks 2>& 5
+				left2read=`
+					expr $left2read - $numblks \* $blksz \
+					|| :
+				`
+			fi
+			if test "$left2read" != 0
+			then
+				dd bs=$left2read count=1 2>& 5
+			fi
+		} > "$2" 5> /dev/null
+	unwind
+}
+
+# Replace the combined XOR sum of app stripes below base directory $1 in such
+# a way that it becomes the contents of $3. If that was successful do the same
+# with base directory $2. During the process of replacing the XOR sum, also
+# replace 25 % of the stripes with new random data and randomly select one
+# other stripe for being overwritten with the final stripe.
+overwrite_afis() {
+	die NYI
+}
+
+# Check the signature in reconstructed slot area in file $1.
+verify_slots() {
+	{
+		dd if="$1" bs=$bytes_per_slot \
+			skip=$slot_area_offset_slots \
+			count=1 of="$TD"/has 2>& 5
+		write_signature > "$TD"/shall 2>& 5
+		if cmp -s -- "$TD"/has "$TD"/shall
+		then
+			rm -- "$TD"/has "$TD"/shall
+		else
+			die "Invalid slot area signature!"
+		fi
+	} 5> /dev/null
+}
+
+# Write the contents of slot $2 below AFIS base directory $1 to standard
+# output.
+read_afis_slot() {
+	reconstruct_afis "$1" > "$TD"/slots
+	verify_slots "$TD"/slots
+	dd if="$TD/slots" bs=$bytes_per_slot \
+		skip=`expr $slot_area_offset_slots + 1 + $2` \
+		count=1 2> /dev/null
 }
 
 slots_per_KiB=`expr $KiB / $bytes_per_slot`
@@ -485,30 +544,33 @@ scope
 	case $1 in
 		format)
 			test $# = 2; test -d "$2"
-			format_avis "$2"
+			format_afis "$2"
 			;;
 		reconstruct)
 			test $# = 2
-			verify_avis_dir "$2"
-			reconstruct_avis "$2"
+			verify_afis_dir "$2"
+			reconstruct_afis "$2"
 			;;
 		overwrite)
 			test $# = 3
-			verify_avis_dir "$2"
-			verify_avis_dir "$3"
+			verify_afis_dir "$2"
+			verify_afis_dir "$3"
 			read_rest `expr KiB \* KiB_per_stripe` \
 				"$TD"/whole_store
+			overwrite_afis "$2" "$3" "$TD"/whole_store
 			;;
 		write)
 			test $# = 4
-			verify_avis_dir "$2"
-			verify_avis_dir "$3"
+			verify_afis_dir "$2"
+			verify_afis_dir "$3"
 			verify_slot_index "$4"
+			die NYI
 			;;
 		read)
 			test $# = 3
-			verify_avis_dir "$2"
+			verify_afis_dir "$2"
 			verify_slot_index "$3"
+			read_afis_slot "$2" "$3"
 			;;
 		'') die "A command verb must be specified!";;
 		*) die "Unsupported command '$1'!"

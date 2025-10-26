@@ -1,0 +1,517 @@
+#! /bin/sh
+exit_version() {
+	wr << =====; exit
+$APP version 2025.299.1
+Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+=====
+}
+APP=${0##*/}
+
+exit_help() {
+	wr << =====; echo; exit_version
+Anti-Forensic Information Splitter (AFIS)
+
+Usage: $APP [ options ] [ <command> [ <parameter> ... ] ]
+
+Usage 1: $APP format <afis_dir_or_backup_dir>
+
+Create the stripes for a AFIS storage.
+
+<afis_dir_or_backup_dir> must be the pathname of the mounted storage, which
+ shall be an ext4 formatted volume with a block size of 4096 bytes, "bigalloc"
+ ext4 feature enabled and a cluster size of 65536 bytes.
+
+This command must be used for both the primary and backup AFIS storage. It
+ will create all the stripes and initialize them with high-quality
+ cryptographic pseudorandom numbers.
+
+The 32 bytes at offset 64 KiB of the last stripe will be written differently,
+ however. They will be calculated from all previous stripes at the same offset
+ and size, being XOR-combined together and also with the text "OK"
+ right-padded with ASCII SPACE characters. This will act as a signature that
+ all the 32-byte slots following this signature (starting with slot 0) are
+ valid.
+
+Usage 2: $APP overwrite <afis_dir> <afis_backup_dir> < <whole_store>
+
+The arguments are the paths to the mounted AFIS and AFIS Backup volumes.
+
+It will read a binary string with the same size as every stripe.
+
+Then in will randomly select 1/4th of the stripes from the backup volume and
+ replace them with new random numbers. After that, one of the remaining
+ stripes will be chosen at random and will be replaced by the XOR of the other
+ stripes and <whole_store>.
+
+This means that if all stripes will be combined with XOR, <whole_store> will
+ result.
+
+<whole_store> must contain the same signature as explained for the "format"
+ command. Otherwise, it will not be possible to read or update slots.
+
+After this operation has successfully been performed with the backup volume,
+ it will be repeated with the primary AFIS volume (but using different random
+ numbers).
+
+After this command finishes, the stripes in the primary and backup volumes
+ will contain different data. But when XORing the stripes of each store
+ together, both volumes will produce <whole_store> as the result.
+
+Usage 3: $APP reconstruct <afis_dir>
+
+This command will XOR together all stripes found in <afis_dir>, which may
+ either be the pathname of the mounted primary or the backup AFIS volume.
+
+It will then write the combined result to standard output, which will be the
+ same size as every of the stripes.
+
+Usage 4: $APP write <afis_dir> <afis_backup_dir> <slot_number>
+
+This will replace one slot of the AFIS store with new high-quality
+ cryptographic random numbers. The remaining slots will not be altered.
+
+The store in the <afis_backup_dir> will be attempted to be updated first. Only
+ if this succeeds, the store in <afis_dir> will be updated to the same new
+ random numbers.
+
+The first slot number is 0. Each slot is 32 bytes and all slots are
+ contiguous. The slot area starts at offset 64 KiB into the XOR-combined
+ stripes. However, slot 0 does not start at the beginning of the slot area.
+ Before slot 0 there is a pseudo-slot which contains the constant text "OK"
+ padded with ASCII SPACE. This works as a marker that the actual slots are
+ valid.
+
+This command is a high-level command which uses the "reconstruct" and
+ "overwrite" commands internally in order to do the actual work.
+
+This command shall be used when the pass phrase for a slot is being changed,
+ or a slot is taken into use for the first time.
+
+Usage 5: $APP read <afis_dir> <slot_number>
+
+Reads the 32-byte contents from the AFIS slot with index <slot_number> (the
+ first slot has index 0) and write it to standard output.
+
+The returned byte-string shall be used as a salt to derive the actual
+ decryption key of encrypted data associated with the slot.
+=====
+}
+
+required_tools='
+	gbcrypt2
+	haveged
+	isaac
+	keygen-octets-by-harvesting-entropy
+	pwgen-with-entropy-harvesting-as-base62
+	xor
+'
+num_stripes=32
+KiB=1024
+bytes_per_slot=32
+KiB_per_stripe=256
+stripe_subdir='stripes'
+slot_subdir='slots'
+slot_area_KiB_offset=64
+set -e
+
+# Provides: trap_errors-3vnzcvh9hfs134g6ln6cy567k
+# Version: 2025.299
+
+# Verifies that "set -e" has been set before sourcing this snippet.
+
+case $- in
+	*e*) ;;
+	*) false || exit
+esac
+
+# Provides: scopes-hqxbfzp9026esereelim9tbyk
+# Requires: trap_errors-3vnzcvh9hfs134g6ln6cy567k
+# Version: 2025.299
+#
+# Copyright (c) 2022-2025 Guenther Brunthaler. All rights reserved.
+
+# POSIX-compliant portable replacement for the "local"-extension of many
+# shells.
+#
+# It is also much more powerful because it provides a destructor-like
+# "finally" mechanism.
+#
+# This shell script snippet is free software.
+# Distribution is permitted under the terms of the GPLv3.
+#
+# It works like this: Start a logical scope by calling "scope". A good place
+# for this is the beginning of a shell function (but it can really be done
+# anywhere). Then declare as many variables with "var" as you like and/or use
+# "finally" to queue any number of cleanup commands to be executed later.
+# "Declaring" variables will queue destructors for restoring the old values
+# later. When you are done, call "unwind" at the end of the logical scope
+# (such as before leaving a function. This will restore all the original
+# variable values and also execute all the "finally" destructors.
+#
+# Note that "scope"/"unwind" can be nested to arbitrary depth. Functions using
+# scopes can thus call other functions using their own scopes.
+#
+# Arguments for a destructor may be pushed onto the stack using pushvar() and
+# push() before queueing the destructor itself with finally(). The destructor
+# can then pop the pushed values off the stack (in reverse order) with
+# popvar() and use them.
+#
+# pushvar() is more efficient than push(). Use push() only if the value to be
+# pushed onto the stack is not already stored within some variable.
+#
+# At the end of your script, call shutdown_scopes(). This is not strictly
+# necessary but recommended. It verifies that no one forgot to call unwind().
+# Never "return" without calling unwind() first from within a scope inside a
+# function! shutdown_scopes() also unsets all global variables set by THIS
+# script snippet, which means the scope framework functions cannot be called
+# any longer.
+#
+# Not all functions need to use scope/unwind. Only such functions which need
+# local variables or destructor functionality should do so.
+
+# Push value from variable with name $1 onto the stack.
+pushvar() {
+	eval stack_$stack_pointer=\$$1
+	stack_pointer=`expr $stack_pointer + 1`
+}
+stack_pointer=1
+
+# Pop variable with name $1 off the stack.
+popvar() {
+	stack_pointer=`expr $stack_pointer - 1`
+	eval $1=\$stack_$stack_pointer
+	unset stack_$stack_pointer
+}
+
+# Push value $* onto the stack.
+push() {
+	v_l9mcnt736v1nhnvy8z2zif4gq=$*
+	pushvar v_l9mcnt736v1nhnvy8z2zif4gq
+}
+
+# Schedule an expression for evaluation when unwind() is called.
+finally() {
+	push "$@"
+}
+
+# Define a new scope where unwind() will stop.
+scope() {
+	push
+}
+
+# Schedule another list of variables to be restored when unwind() is called.
+var() {
+	for v_kxelefrxs6up7y7kmkdy194n0
+	do
+		eval v_l9mcnt736v1nhnvy8z2zif4gq=`:
+			`\${$v_kxelefrxs6up7y7kmkdy194n0+set}
+		case $v_l9mcnt736v1nhnvy8z2zif4gq in
+			'')
+				finally unset $v_kxelefrxs6up7y7kmkdy194n0
+				;;
+			*)
+				pushvar $v_kxelefrxs6up7y7kmkdy194n0
+				finally popvar $v_kxelefrxs6up7y7kmkdy194n0
+		esac
+	done
+}
+
+# Excute all scheduled "finally" expressions until beginning of scope().
+unwind() {
+	while :
+	do
+		popvar v_bwpyjg117sqz7tintf1ridnua
+		case $v_bwpyjg117sqz7tintf1ridnua in
+			'') break
+		esac
+		eval "$v_bwpyjg117sqz7tintf1ridnua"
+	done
+}
+
+# Verify that all resources on the stack have been cleaned up and all
+# scheduled destructors have been run. Then unset all global variables set by
+# the scope helpers framework. This effectively shuts down the framework.
+shutdown_scopes() {
+	case $stack_pointer in
+		1) ;;
+		*) echo "Resource leak!" >& 2; false || exit
+	esac
+	unset stack_pointer v_bwpyjg117sqz7tintf1ridnua \
+		v_kxelefrxs6up7y7kmkdy194n0 v_l9mcnt736v1nhnvy8z2zif4gq
+}
+
+# Provides: cleanup-l98e2762zc08fyiqt8787lpk5
+# Requires: scopes-hqxbfzp9026esereelim9tbyk
+# Requires: trap_errors-3vnzcvh9hfs134g6ln6cy567k
+# Version: 2025.299
+
+# Install an error handler which calls unwind() to run all (if any)
+# outstanding finally() handlers for cleaning up before actually exiting.
+
+cleanup_l98e2762zc08fyiqt8787lpk5() {
+	rc_l98e2762zc08fyiqt8787lpk5=$?
+	case $stack_pointer in
+		'') ;;
+		*)
+			while test "$stack_pointer" != 1
+			do
+				unwind
+			done
+			
+	esac
+	test $rc_l98e2762zc08fyiqt8787lpk5 = 0 || echo "\"$0\" failed!" >& 2
+	unset rc_l98e2762zc08fyiqt8787lpk5
+}
+trap cleanup_l98e2762zc08fyiqt8787lpk5 0
+trap 'exit $?' INT HUP QUIT TERM PIPE
+
+# Provides: tmpdir-p6fbwwutega7v29jg3ea1s4ws
+# Requires: cleanup-l98e2762zc08fyiqt8787lpk5
+# Version: 2025.299
+
+cleanup_tmpdir() {
+	popvar TD
+	rm -r -- "$TD"
+}
+
+create_tmpdir() {
+	var TD
+	TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}".XXXXXXXXXX`
+	pushvar TD
+	finally cleanup_tmpdir
+}
+
+# Provides: println-871v57a0dzb6d3rxykj87vsnf
+# Version: 2025.299
+
+println() {
+	printf '%s\n' "$*"
+}
+
+# Provides: die-6835duvlwu7m57waedkdiwmgh
+# Requires: println-871v57a0dzb6d3rxykj87vsnf
+# Version: 2025.299
+
+die() {
+	println "$*" >& 2
+	false || exit
+}
+
+# Provides: main_program-dyiuw0123fp18dmplp53re5ds
+# Requires: scopes-hqxbfzp9026esereelim9tbyk
+# Requires: tmpdir-p6fbwwutega7v29jg3ea1s4ws
+# Requires: die-6835duvlwu7m57waedkdiwmgh
+
+wr() {
+	{
+		unterminated=false
+		while IFS= read -r line
+		do
+			test "${line%" "}" = "$line"
+			test "${line#" "}" != "$line" && unterminated=false
+			$unterminated && echo
+			printf '%s' "$line"
+			unterminated=true
+		done
+		$unterminated && echo
+	} | fold -sw ${COLUMNS:-66}
+}
+
+verify_slot_index() {
+	expr x"$1" : x'0$' '|' x"$1" : x'[1-9][0-9]*$' > /dev/null
+	test $1 -le $last_slot
+}
+
+rng_dtor() {
+	popvar rng_pid
+	exec 8<& -
+	kill $rng_pid || :
+	wait $rng_pid 2> /dev/null || :
+}
+
+# Make cryptographically strong pseudorandom bytestream available via file
+# descriptor # 8.
+start_rng_fd_8() {
+	echo "Harvesting true random seed ..." >& 2
+	# Generate a password with 256 bits of entropy gathered from hardware
+	# volatility and other sources. This will take a couple of seconds;
+	# inform the user about the delay.
+	pwgen-with-entropy-harvesting-as-base62 > "$TD"/psw
+	# ISAAC needs 1024 bytes as seed. Generate it by encrypting a string
+	# of binary zeroes with the password just generated.
+	echo "Deriving CSPRNG seed ..." >& 2
+	dd if=/dev/zero bs=1024 count=1 > "$TD"/zero 2> /dev/null
+	gbcrypt2 -- "$TD"/psw < "$TD"/zero > "$TD"/preseed
+	# Data encrypted with "gbcrypt2" starts with a 32 byte nonce followed
+	# by the encrypted data, followed by a MAC. Extract only the encrypted
+	# data as seed for ISAAC.
+	dd if="$TD"/preseed bs=32 skip=1 count=`expr 1024 / 32` \
+		of="$TD"/seed 2> /dev/null
+	mkfifo -- "$TD"/rng
+	var rng_pid
+	isaac < "$TD"/seed > "$TD"/rng & rng_pid=$!
+	pushvar rng_pid; finally rng_dtor
+	exec 8< "$TD"/rng
+	rm -- "$TD"/rng "$TD"/seed "$TD"/preseed "$TD"/zero "$TD"/psw
+	echo "Done." >& 2
+}
+
+# $1: basedir, $2: slot index
+stripe_pathname() {
+	scope
+		var fmt
+		fmt=stripe-%0${stripe_index_digits}u.bin
+		printf "%s/$fmt" "$1/$stripe_subdir" "$2"
+	unwind
+}
+
+write_signature() {
+	printf '%-32s' OK
+}
+
+format_avis() {
+	test ! -e "$1/$stripe_subdir"
+	test ! -e "$1/$slot_subdir"
+	mkdir -m 700 -- "$1/$stripe_subdir" "$1/$slot_subdir"
+	scope
+		var i spn last_i
+		i=0 last_i=`expr $num_stripes - 1`
+		start_rng_fd_8
+		echo Generating stripes from CSPRNG... >& 2
+		while test $i != $num_stripes
+		do
+			dd <& 8 of="$TD"/stripe \
+				bs=$KiB count=$KiB_per_stripe 2>& 5
+			if test $i = 0
+			then
+				cp -- "$TD"/stripe "$TD"/comb
+			else
+				xor -- "$TD"/comb < "$TD"/stripe \
+					> "$TD"/comb.tmp
+				mv -- "$TD"/comb.tmp "$TD"/comb
+			fi
+			if test $i = $last_i
+			then
+				# Modify last stripe so that it will
+				# reconstruct into the slot signature marker.
+				write_signature > "$TD"/marker
+				dd if="$TD"/stripe bs=$bytes_per_slot \
+					skip=$slot_area_offset_slots count=1 \
+					of="$TD/current" 2>& 5
+				dd if="$TD"/comb bs=$bytes_per_slot \
+					skip=$slot_area_offset_slots count=1 \
+					2>& 5 \
+				| xor -- "$TD"/current \
+				| xor -- "$TD"/marker \
+				| dd of="$TD"/stripe bs=$bytes_per_slot \
+					conv=notrunc \
+					seek=$slot_area_offset_slots count=1 \
+					2>& 5
+			fi
+			spn=`stripe_pathname "$1" $i`
+			test ! -e "$spn"
+			(umask 77; cat -- "$TD"/stripe > "$spn")
+			i=`expr $i + 1`
+		done 5> /dev/null
+		echo $num_stripes stripes have successfully been created.
+	unwind
+}
+
+verify_avis_dir() {
+	test -d "$1/$stripe_subdir"
+	test -d "$1/$slot_subdir"
+}
+
+reconstruct_avis() {
+	scope
+		var i spn
+		i=0
+		while test $i != $num_stripes
+		do
+			spn=`stripe_pathname "$1" $i`
+			test -f "$spn"
+			if test $i = 0
+			then
+				cp -- "$spn" "$TD"/comb
+			else
+				xor -- "$spn" < "$TD"/comb \
+					> "$TD"/comb.tmp
+				mv -- "$TD"/comb.tmp "$TD"/comb
+			fi
+			i=`expr $i + 1`
+		done
+		cat -- "$TD"/comb
+	unwind
+}
+
+slots_per_KiB=`expr $KiB / $bytes_per_slot`
+stripe_index_digits=`expr $num_stripes - 1`
+stripe_index_digits=${#stripe_index_digits}
+last_slot=`
+	expr \( $KiB_per_stripe - $slot_area_KiB_offset \) \
+		\* $slots_per_KiB - 1
+`
+slot_area_offset_slots=`expr $slot_area_KiB_offset \* $slots_per_KiB`
+scope
+	scope
+		var tool is_all_ok
+		is_all_ok=true
+		for tool in $required_tools
+		do
+			command -v "$tool" >& 5 2>& 5 && continue
+			echo "Required utility '$tool'" \
+				"could not be found!" >& 2
+			is_all_ok=false
+		done 5> /dev/null
+		$is_all_ok
+	unwind
+	scope
+		var opt
+		while getopts hV opt
+		do
+			case $opt in
+				h) unwind; exit_help;;
+				V) unwind; exit_version;;
+				*) false || exit
+			esac
+		done
+		shift `expr $OPTIND - 1 || :`
+	unwind
+	create_tmpdir
+	case `stat -f -c '%T' -- "$TD"` in
+		ramfs | tmpfs) ;;
+		*) die "Directory '${TMPDIR:-/tmp}' must be a tmpfs or ramfs!"
+	esac
+	case $1 in
+		format)
+			test $# = 2; test -d "$2"
+			format_avis "$2"
+			;;
+		reconstruct)
+			test $# = 2
+			verify_avis_dir "$2"
+			reconstruct_avis "$2"
+			;;
+		overwrite)
+			test $# = 3
+			verify_avis_dir "$2"
+			verify_avis_dir "$3"
+			read_rest `expr KiB \* KiB_per_stripe` \
+				"$TD"/whole_store
+			;;
+		write)
+			test $# = 4
+			verify_avis_dir "$2"
+			verify_avis_dir "$3"
+			verify_slot_index "$4"
+			;;
+		read)
+			test $# = 3
+			verify_avis_dir "$2"
+			verify_slot_index "$3"
+			;;
+		'') die "A command verb must be specified!";;
+		*) die "Unsupported command '$1'!"
+	esac
+unwind
+shutdown_scopes

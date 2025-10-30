@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	wr << =====; exit
-$APP version 2025.303.1
+$APP version 2025.303.2
 Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
 =====
 }
@@ -49,7 +49,7 @@ This means that if all stripes will be combined with XOR, <whole_store> will
 
 <whole_store> must contain the same signature as explained for the "format"
  command. Otherwise, it will not be possible to read or update slots.
- 
+
 Usage 3: $APP reconstruct <afis_dir>
 
 This command will XOR together all stripes found in <afis_dir>, which may
@@ -92,7 +92,7 @@ Derives a secondary password from the current contents of slot <slot_number>
  password to encrypt standard input (which is usually the master password for
  some storage device). The encrypted result is then stored into the slot file
  area of <afis_dir>.
- 
+
 Note that the AFIS slot should be overwritten with new random numbers before
  using a new or updated <psw_file> with this command.
 

@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	wr << =====; exit
-$APP version 2025.303
+$APP version 2025.303.1
 Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
 =====
 }
@@ -58,14 +58,10 @@ This command will XOR together all stripes found in <afis_dir>, which may
 It will then write the combined result to standard output, which will be the
  same size as every of the stripes.
 
-Usage 4: $APP write <afis_dir> <afis_backup_dir> <slot_number>
+Usage 4: $APP write <afis_dir> <slot_number>
 
 This will replace one slot of the AFIS store with new high-quality
  cryptographic random numbers. The remaining slots will not be altered.
-
-The store in the <afis_backup_dir> will be attempted to be updated first. Only
- if this succeeds, the store in <afis_dir> will be updated to the same new
- random numbers.
 
 The first slot number is 0. Each slot is 32 bytes and all slots are
  contiguous. The slot area starts at offset 64 KiB into the XOR-combined
@@ -87,6 +83,27 @@ Reads the 32-byte contents from the AFIS slot with index <slot_number> (the
 
 The returned byte-string shall be used as a salt to derive the actual
  decryption key of encrypted data associated with the slot.
+
+Usage 6: $APP encrypt <psw_file> <afis_dir> <slot_number> < <plaintext>
+
+Derives a secondary password from the current contents of slot <slot_number>
+ in AFIS base directory <afis_dir>. Then sandwiches the primary password from
+ <psw_file> between 2 copies of the secondary password and use the combined
+ password to encrypt standard input (which is usually the master password for
+ some storage device). The encrypted result is then stored into the slot file
+ area of <afis_dir>.
+ 
+Note that the AFIS slot should be overwritten with new random numbers before
+ using a new or updated <psw_file> with this command.
+
+Usage 7: $APP decrypt <psw_file> <afis_dir> <slot_number> > <plaintext>
+
+Derives a secondary password from the current contents of slot <slot_number>
+ in AFIS base directory <afis_dir>. Then sandwiches the primary password from
+ <psw_file> between 2 copies of the secondary password and use the combined
+ password to decrypt the encrypted file associated with <slot_number> from the
+ the slot file area of <afis_dir>. The decrypted result is written to standard
+ output (which will typically be the master password for some storage device).
 =====
 }
 
@@ -509,19 +526,21 @@ overwrite_single() {
 	unwind
 }
 
+calc_specials() {
+	var specials
+	# floor($num_stripes / 100 * 25 + 0.5)
+	specials=`expr \( $num_stripes \* 50 + 100 \) / 200`
+}
+
 # Replace the combined XOR sum of app stripes below AFIS base directory $1
 # with the contents of file $2. During the process of replacing the XOR sum,
 # also replace 25 % of the stripes with new random data and randomly select
 # one other stripe for being overwritten with the final stripe.
 overwrite_afis() {
 	scope
-		var specials
-		# floor($num_stripes / 100 * 25 + 0.5)
-		specials=`expr \( $num_stripes \* 50 + 100 \) / 200`
+		calc_specials
 		start_rng_fd_8
-		{
-			overwrite_single "$1" "$2"
-		} 5> /dev/null
+		overwrite_single "$1" "$2" 5> /dev/null
 	unwind
 }
 
@@ -555,6 +574,52 @@ read_afis_slot() {
 	dd $dd_opts if="$TD/slots" bs=$bytes_per_slot \
 		skip=`expr $slot_area_offset_slots + 1 + $2` \
 		count=1 2> /dev/null
+}
+
+# Replace the contents of slot $2 below AFIS base directory $1 to standard
+# with new random numbers derived from CSPRNG seeded with true random numbers.
+write_afis_slot() {
+	verify_afis "$1"
+	scope
+		verify_afis "$1"
+		start_rng_fd_8
+		calc_specials
+		{
+			dd $dd_opts <& 8 conv=notrunc of="$TD/slots" \
+				bs=$bytes_per_slot \
+				seek=`expr $slot_area_offset_slots + 1 + $2` \
+				count=1 2>& 5
+			overwrite_single "$1" "$TD"/slots
+		} 5> /dev/null
+	unwind
+}
+
+# Derive a combined password from user-provided password in file $1 and from a
+# secondary password derived from slot $3 of AFIS base directory $2. Save the
+# combined password as file "$TD/psw".
+derive_psw() {
+	read_afis_slot "$2" "$3" | base64 | tr -d = > "$TD"/psw2
+	{
+		cat -- "$TD"/psw2 "$1" "$TD"/psw2 | tr -d '\n'
+		echo
+	} > "$TD"/psw
+	rm -- "$TD"/psw2
+}
+
+# Use user-provided password in file $1 in order to encrypt a master password
+# read from stdin and store the encrypted file in AFIS directory $2 associated
+# with slot $3.
+encrypt_afis_slot() {
+	derive_psw "$@"
+	gbcrypt2 "$TD"/psw > "$2/$slot_subdir/$3.gc2"
+}
+
+# Use user-provided password in file $1 in order to decrypt the encrypted file
+# in AFIS directory $2 associated with slot $3 and write the decrypted master
+# password to stdout.
+decrypt_afis_slot() {
+	derive_psw "$@"
+	gbcrypt2 "$TD"/psw "$2/$slot_subdir/$3.gc2"
 }
 
 slots_per_KiB=`expr $KiB / $bytes_per_slot`
@@ -616,17 +681,30 @@ scope
 			overwrite_afis "$2" "$TD"/whole_store
 			;;
 		write)
-			test $# = 4
+			test $# = 3
 			verify_afis_dir "$2"
-			verify_afis_dir "$3"
-			verify_slot_index "$4"
-			die NYI
+			verify_slot_index "$3"
+			write_afis_slot "$2" "$3"
 			;;
 		read)
 			test $# = 3
 			verify_afis_dir "$2"
 			verify_slot_index "$3"
 			read_afis_slot "$2" "$3"
+			;;
+		encrypt)
+			test $# = 4
+			test -f "$2"
+			verify_afis_dir "$3"
+			verify_slot_index "$4"
+			encrypt_afis_slot "$2" "$3" "$4"
+			;;
+		decrypt)
+			test $# = 4
+			test -f "$2"
+			verify_afis_dir "$3"
+			verify_slot_index "$4"
+			decrypt_afis_slot "$2" "$3" "$4"
 			;;
 		'') die "A command verb must be specified!";;
 		*) die "Unsupported command '$1'!"

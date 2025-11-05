@@ -1,7 +1,7 @@
 #! /bin/sh
 exit_version() {
 	wr << =====; exit
-$APP version 2025.303.2
+$APP version 2025.309
 Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
 =====
 }
@@ -118,7 +118,7 @@ required_tools='
 num_stripes=32
 KiB=1024
 bytes_per_slot=32
-KiB_per_stripe=256
+KiB_per_stripe=192
 stripe_subdir='stripes'
 slot_subdir='slots'
 slot_area_KiB_offset=64

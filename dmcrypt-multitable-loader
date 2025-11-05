@@ -1,0 +1,116 @@
+#! /bin/sh
+
+# Reads multiple dmcrypt-tables from standard input and creates an active
+# mapping for every single table. If a mapping already exists, it will be
+# skipped, assuming the associated table has already been mapped.
+#
+# Every table must be preceded by a line containing the name of the mapping to
+# be created for the table following this line. The tables themselves must
+# contain one or more lines which will be passed directly to "dmcrypt create".
+#
+# It is also possible to pass option "-u". In this case, it will be tried to
+# unmap all mappings in the reverse order of how the tables are specified.
+#
+# Version 2025.309
+# Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+#
+# This script is free software.
+# Distribution is permitted under the terms of the GPLv3.
+
+set -e
+cleanup() {
+	rc=$?
+	test "$TD" && rm -r -- "$TD"
+	test $rc = 0 || echo "\"$0\" failed!" >& 2
+}
+TD=
+trap cleanup 0
+trap 'exit $?' INT HUP QUIT TERM PIPE
+
+unmap=false
+dry_run=false
+while getopts nu opt
+do
+	case $opt in
+		n) dry_run=true;;
+		u) unmap=true;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :`
+
+# Portable version of "tac":
+tac() {
+	awk '{print NR ":" $0}' | sort -t : -k 1,1nr | cut -d : -f 2-
+}
+
+run() {
+	$dry_run && set echo SIMULATION: "$@"
+	"$@"
+}
+
+if $unmap
+then
+	grep -E '^[^#[:space:]]+$' \
+	| tac \
+	| while read m
+	do
+		if test -b /dev/mapper/"$m"
+		then
+			echo "Unmapping '$m'..." >& 2
+			run dmsetup remove -- "$m"
+		else
+			echo "Not unmapping already-unmapped '$m'..." >& 2
+		fi
+		# Wait for udev to remove device mapper symlink.
+		secs=3
+		while test -e /dev/mapper/"$m"
+		do
+			sleep 1
+			secs=`expr $secs - 1` || {
+				# udev did not do it. Probably it is not
+				# running. Remove the symlink ourselves.
+				run rm /dev/mapper/"$m"
+				break
+			}
+		done
+	done
+else
+	TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}".XXXXXXXXXX`
+	# Normalize whitespace and then remove comments and empty lines from
+	# standard input.
+	sed -f /dev/fd/5 5<<- '======' > "$TD"/unproc
+		# Normalize whitespace.
+		s/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//
+		# Remove empty lines and comments.
+		/^#/d; /^$/d
+	======
+	while read m < "$TD"/unproc
+	do
+		 sed '2,/^[^ ]*$/!d; /^[^ ]*$/d' "$TD"/unproc > "$TD"/table
+		 sed '1d; 2,/^[^ ]*$/{/^[^ ]*$/p; d}' \
+		 	"$TD"/unproc > "$TD"/rest
+		 if test -b /dev/mapper/"$m"
+		 then
+		 	echo "Re-using existing mapping for $m" >& 2
+		 else
+		 	echo "Mapping $m" >& 2
+		 	run dmsetup create $m < "$TD"/table
+		 	# Wait for udev to remove device mapper symlink.
+		 	secs=4 phase=1
+		 	while test ! -b /dev/mapper/"$m"
+		 	do
+		 		sleep 1
+		 		secs=`expr $secs - 1` || {
+		 			test $phase = 1
+		 			# udev did not do it. Probably it is
+		 			# not running. Create the device node
+		 			# and symlink explcitly.
+		 			run dmsetup mknodes -- "$m"
+		 			secs=3 phase=2
+		 		}
+		 	done
+		 fi
+		 mv -- "$TD"/rest "$TD"/unproc
+	done
+fi

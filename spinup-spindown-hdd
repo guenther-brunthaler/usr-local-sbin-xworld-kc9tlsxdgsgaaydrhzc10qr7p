@@ -1,0 +1,174 @@
+#! /bin/sh
+exit_version() {
+	wr << ======; exit
+$APP Version 2025.363
+Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+
+This script is free software.
+Distribution is permitted under the terms of the GPLv3.
+======
+}
+APP=${0##*/}
+
+exit_help() {
+	wr << ======; echo; exit_version
+$APP make hard drives spin up or down
+
+Usage: $APP [ <options> ...] <drive_blockdev_1> ...
+
+$APP reprograms hard drives so that they will either spin down automatically
+ after being idle for some time, or makes them spin-up again and never spin
+ down automatically.
+
+$APP is a front-end for running the 'hdparm' utility with appropriate
+ parameters for its "-B" and "-S" options.
+
+At least one path of a block device is required.
+
+The paths must refer to a whole device, not just the path of some partition on
+ a drive. Otherwise a warning will be displayed and the drive will be ignored.
+
+Specifying either -u or -d is mandatory and determines how the drives will be
+ reprogrammed:
+
+If -u is specified, the drives will be set to full-performance mode, spinning
+ them up if they are currently spun down. The drives will also keep spinning,
+ no matter how much time passed.
+
+If -d is specified, the drives will be set to maximum power saving mode. When
+ such drives have been idle for some time, they will spin down automatically
+ in order to save power, produce no further heat or noise. Then a drive is
+ accessed while spun down, it will temporarily spin up in order to satisfy the
+ access. However, the spin-down timer will be started again, spinning the
+ drive down if no more accesses occur during the time-out period.
+
+Supported options:
+
+-u: Make the specified drives spin up again and keep spinning.
+-d: Make the specified drives spin down after some time of inactivity.
+-n: Dry run. Show what would be done, but don't actually do anything.
+-h: Show *THIS* help and exit.
+-V: Show version information and exit.
+======
+}
+
+set -e
+trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
+
+die_usage() {
+	(exit_help); false || exit
+}
+
+die() {
+	printf '%s\n' "$*" >& 2
+	false || exit
+}
+
+run() {
+	$dry_run && set echo SIMULATION: "$@"
+	"$@"
+}
+
+wr() {
+	{
+		unterminated=false
+		while IFS= read -r line
+		do
+			test "${line%" "}" = "$line"
+			test "${line#" "}" != "$line" && unterminated=false
+			$unterminated && echo
+			printf '%s' "$line"
+			unterminated=true
+		done
+		$unterminated && echo
+	} | fold -sw ${COLUMNS:-66}
+}
+
+spin_down=
+dry_run=false
+while getopts nudhV opt
+do
+	case $opt in
+		u) spin_down=false;;
+		d) spin_down=true;;
+		n) dry_run=true;;
+		h) exit_help;;
+		V) exit_version;;
+		*) false || exit
+	esac
+done
+shift `expr $OPTIND - 1 || :` 
+
+cmds='hdparm'
+
+ok=true
+for cmd in $cmds
+do
+	command -v "$cmd" >& 5 && continue
+	echo "Required utility '$cmd' is missing!"
+	ok=false
+done >& 2 5> /dev/null
+if $ok
+then
+	unset ok
+else
+	echo "Some required utilities are missing!"
+	echo "Please install them and then try again."
+	false || exit
+fi >& 2
+
+not_whole() {
+	echo "Skipping '$1': Does not refer to a whole drive." >& 2
+}
+
+process_drive() {
+	if test ! -b "$1"
+	then
+		echo "Skipping '$1': Not a block device." >& 2; return
+	fi
+	case $1 in
+		/dev/disk/by-id/*)
+			if expr x"$1" : x'.*-part[0-9]\{1,\}$' > /dev/null
+			then
+				not_whole "$1"; return
+			fi
+			;;
+		/dev/loop[0-9]*)
+			echo "Skipping '$1': Is a loopback block device." >& 2
+			return
+			;;
+		*)
+			t=`readlink -f -- "$1"`; t=${t##*/}
+			expr x"$t" : x'[a-z][^/]*$' > /dev/null
+			if expr x"$t" : x'.*[^0-9][1-9][0-9]*$' > /dev/null
+			then
+				not_whole "$1"; return
+			fi
+	esac
+	if $spin_down
+	then
+		# Maximum power saving, enable auto spin-down, start spin-down
+		# timer.
+		run hdparm -B 1 -S 241 -- "$1"
+	else
+		# Maximum performance, disable auto spin-down, wake up
+		# immediately if currently spun down.
+		run hdparm -B 254 -S 0 -- "$1"
+	fi
+}
+
+test "$spin_down" || die_usage
+case $# in
+	0)
+		test -t 0 && die_usage
+		while IFS= read -r drive
+		do
+			process_drive "$drive"
+		done
+		;;
+	*)
+		for drive
+		do
+			process_drive "$drive"
+		done
+esac

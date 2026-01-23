@@ -4,6 +4,22 @@
 # mapping for every single table. If a mapping already exists, it will be
 # skipped, assuming the associated table has already been mapped.
 #
+# The input may also contain empty lines and line-comments starting with "#"
+# which will be completely ignored.
+#
+# If the 2nd field ("nsecs") of a "crypt" table entry contains a "*"
+# immediately (no separating spaces) followed by a count of 512-byte sectors,
+# then the 2nd field of the actual table written will be replaced by the count
+# of 512-bytes sectors of the device found in the 7th field ("dev") minus the
+# count before the "*" minus the count of the 8th field ("startdevsec"). For
+# additional comfort, "*0" in the 2nd field can also be written as "*".
+#
+# The idea of the "*"-feature is that the table does not need to be edited if
+# the encrypted volume gets resized. It is assumed that the volume has a
+# prefix, then the encrypted data, then a suffix. The size of the prefix is
+# specified by the "startdevsec" field, and the size of the suffix is
+# specified with the "*" marker in the "nsecs" field.
+#
 # Every table must be preceded by a line containing the name of the mapping to
 # be created for the table following this line. The tables themselves must
 # contain one or more lines which will be passed directly to "dmcrypt create".
@@ -11,8 +27,8 @@
 # It is also possible to pass option "-u". In this case, it will be tried to
 # unmap all mappings in the reverse order of how the tables are specified.
 #
-# Version 2025.309
-# Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+# Version 2026.2
+# Copyright (c) 2025-2026 Guenther Brunthaler. All rights reserved.
 #
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
@@ -29,9 +45,11 @@ trap 'exit $?' INT HUP QUIT TERM PIPE
 
 unmap=false
 dry_run=false
-while getopts nu opt
+show_tables=false
+while getopts snu opt
 do
 	case $opt in
+		s) show_tables=true;;
 		n) dry_run=true;;
 		u) unmap=true;;
 		*) false || exit
@@ -47,6 +65,87 @@ tac() {
 run() {
 	$dry_run && set echo SIMULATION: "$@"
 	"$@"
+}
+
+# Replace "*"-expression in the 2nd table field with a count of 512-byte
+# sectors.
+resolve_wildcard() {
+	awk -f /dev/fd/5 5<< 'EO_AWK'
+
+$3 == "crypt" && $2 ~ /^[*][0-9]*$/ {handle_crypt()}
+
+{print}
+
+function handle_crypt(    devblks) {
+	sub(/^[*]/, "", $2); sub(/^$/, "0", $2);
+	devblks = xcmd("blockdev --getsz '" $7 "'")
+	$2 = subtract(subtract(devblks, $8), $2)
+}
+
+# Arbitrary precision unsigned decimal text-representation subtraction.
+#
+# Subtract <y> from <x>, returning the result in the same format without
+# redundant leading zeros.
+#
+# Will abort if the result becomes negative.
+function subtract(x, y    , d, i, nx, ny, borrow, result) {
+	# Make <x> at least as long as <y>.
+	while (length(y) > length(x)) x = "0" x
+	nx = length(x); ny = length(y)
+	# Subtract the digits of y from x.
+	for (i = 0; i < ny; ++i) {
+		if ( \
+			(borrow = \
+				(\
+					d = substr(x, nx - i, 1) \
+					- substr(y, ny - i, 1) \
+					- borrow \
+				) < 0 \
+			) \
+		) {
+			d += 10
+		}
+		result = d result
+	}
+	# Process the remaining digits of x which might be affected by
+	# borrow resulting from earlier digits.
+	for ( ; i < nx; ++i) {
+		if ( \
+			(borrow = \
+				(\
+					d = substr(x, nx - i, 1) \
+					- borrow \
+				) < 0 \
+			) \
+		) {
+			d += 10
+		}
+		result = d result
+	}
+	if (borrow) die("Cannot subtract larger " y " from smaller " x "!")
+	# Remove redundant leading zeros.
+	while (length(result) > 1 && substr(result, 1, 1) == "0") {
+		result = substr(result, 2)
+	}
+	return result
+}
+
+function die(emsg) {
+	print emsg > "/dev/stderr"
+	exit system("false")
+}
+
+function xcmd(cmd    , result) {
+	cmd | getline result
+	close(cmd)
+	return result
+}
+
+EO_AWK
+}
+
+report_table() {
+	awk '$3 == "crypt" {gsub(/./, "?", $5)} {print}'
 }
 
 if $unmap
@@ -87,7 +186,20 @@ else
 	======
 	while read m < "$TD"/unproc
 	do
-		 sed '2,/^[^ ]*$/!d; /^[^ ]*$/d' "$TD"/unproc > "$TD"/table
+		 sed '2,/^[^ ]*$/!d; /^[^ ]*$/d' "$TD"/unproc \
+		 | tee "$TD"/table0 \
+		 | resolve_wildcard > "$TD"/table
+		 if $show_tables
+		 then
+			echo
+			echo "BEGIN ORIGINAL TABLE '$m'"
+			report_table < "$TD"/table0
+			echo "END ORIGINAL TABLE '$m'"
+			echo
+			echo "BEGIN RESOLVED TABLE '$m'"
+			report_table < "$TD"/table
+			echo "END RESOLVED TABLE '$m'"
+		 fi >& 2
 		 sed '1d; 2,/^[^ ]*$/{/^[^ ]*$/p; d}' \
 		 	"$TD"/unproc > "$TD"/rest
 		 if test -b /dev/mapper/"$m"

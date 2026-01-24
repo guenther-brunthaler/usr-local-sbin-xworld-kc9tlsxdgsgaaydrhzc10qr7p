@@ -1,8 +1,8 @@
 #! /bin/sh
 exit_version() {
 	wr << ======; exit
-$APP Version 2025.363
-Copyright (c) 2025 Guenther Brunthaler. All rights reserved.
+$APP Version 2026.24
+Copyright (c) 2025-2026 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
 Distribution is permitted under the terms of the GPLv3.
@@ -41,11 +41,16 @@ If -d is specified, the drives will be set to maximum power saving mode. When
  accessed while spun down, it will temporarily spin up in order to satisfy the
  access. However, the spin-down timer will be started again, spinning the
  drive down if no more accesses occur during the time-out period.
+ 
+-m is something in the middle. Although the disks are kept spinning, maximum
+ power savings are enabled. That might mean that the disks spin slower when
+ not currently in use or that the heads move at a slower speed for seeking.
 
 Supported options:
 
 -u: Make the specified drives spin up again and keep spinning.
 -d: Make the specified drives spin down after some time of inactivity.
+-m: Middle thing: Keep them spinning, but maximize power savings.
 -n: Dry run. Show what would be done, but don't actually do anything.
 -h: Show *THIS* help and exit.
 -V: Show version information and exit.

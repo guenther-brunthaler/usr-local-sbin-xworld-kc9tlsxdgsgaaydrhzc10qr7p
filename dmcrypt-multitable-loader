@@ -1,37 +1,62 @@
 #! /bin/sh
+exit_version() {
+	wr << =======; exit
+$APP Version 2026.27
+Copyright (c) 2025-2026 Guenther Brunthaler. All rights reserved.
 
-# Reads multiple dmcrypt-tables from standard input and creates an active
-# mapping for every single table. If a mapping already exists, it will be
-# skipped, assuming the associated table has already been mapped.
-#
-# The input may also contain empty lines and line-comments starting with "#"
-# which will be completely ignored.
-#
-# If the 2nd field ("nsecs") of a "crypt" table entry contains a "*"
-# immediately (no separating spaces) followed by a count of 512-byte sectors,
-# then the 2nd field of the actual table written will be replaced by the count
-# of 512-bytes sectors of the device found in the 7th field ("dev") minus the
-# count before the "*" minus the count of the 8th field ("startdevsec"). For
-# additional comfort, "*0" in the 2nd field can also be written as "*".
-#
-# The idea of the "*"-feature is that the table does not need to be edited if
-# the encrypted volume gets resized. It is assumed that the volume has a
-# prefix, then the encrypted data, then a suffix. The size of the prefix is
-# specified by the "startdevsec" field, and the size of the suffix is
-# specified with the "*" marker in the "nsecs" field.
-#
-# Every table must be preceded by a line containing the name of the mapping to
-# be created for the table following this line. The tables themselves must
-# contain one or more lines which will be passed directly to "dmcrypt create".
-#
-# It is also possible to pass option "-u". In this case, it will be tried to
-# unmap all mappings in the reverse order of how the tables are specified.
-#
-# Version 2026.2
-# Copyright (c) 2025-2026 Guenther Brunthaler. All rights reserved.
-#
-# This script is free software.
-# Distribution is permitted under the terms of the GPLv3.
+This script is free software.
+Distribution is permitted under the terms of the GPLv3.
+=======
+}
+
+exit_help() {
+	wr << =======; echo; exit_version
+$APP - load multiple dmcrypt tables from a single file
+
+Usage: cat <dmcrypt_table_file> ... | $APP [ <options> ... ]
+
+$APP reads multiple dmcrypt-tables from standard input and creates an active
+ mapping for every single table. If a mapping already exists, it will be
+ skipped, assuming the associated table has already been mapped.
+
+The input may also contain empty lines and line-comments starting with "#"
+ which will be completely ignored.
+
+If the 2nd field ("nsecs") of a "crypt" table entry contains a "*" immediately
+ (no separating spaces) followed by a count of 512-byte sectors, then the 2nd
+ field of the actual table written will be replaced by the count of 512-bytes
+ sectors of the device found in the 7th field ("dev") minus the count before
+ the "*" minus the count of the 8th field ("startdevsec"). For additional
+ comfort, "*0" in the 2nd field can also be written as "*".
+
+The idea of the "*"-feature is that the table does not need to be edited if
+ the encrypted volume gets resized. It is assumed that the volume has a
+ prefix, then the encrypted data, then a suffix. The size of the prefix is
+ specified by the "startdevsec" field, and the size of the suffix is specified
+ with the "*" marker in the "nsecs" field.
+
+Every table must be preceded by a line containing the name of the mapping to
+ be created for the table following this line. The tables themselves must
+ contain one or more lines which will be passed directly to "dmcrypt create".
+
+It is also possible to pass option "-u". In this case, it will be tried to
+ unmap all mappings in the reverse order of how the tables are specified.
+
+Supported options:
+
+-s: Show tables before they are processed.
+
+-n: Dry run. Show what would have been done, but don't actually do anything.
+
+-u: Instead of mapping the devices in the tables, unmap them (in reverse entry
+ order).
+
+-V: Show version information and exit.
+
+-h) Show THIS help and exit.
+=======
+}
+APP=${0##*/}
 
 set -e
 cleanup() {
@@ -43,15 +68,32 @@ TD=
 trap cleanup 0
 trap 'exit $?' INT HUP QUIT TERM PIPE
 
+wr() {
+	{
+		unterminated=false
+		while IFS= read -r line
+		do
+			test "${line%" "}" = "$line"
+			test "${line#" "}" != "$line" && unterminated=false
+			$unterminated && echo
+			printf '%s' "$line"
+			unterminated=true
+		done
+		$unterminated && echo
+	} | fold -sw ${COLUMNS:-66}
+}
+
 unmap=false
 dry_run=false
 show_tables=false
-while getopts snu opt
+while getopts snuVh opt
 do
 	case $opt in
 		s) show_tables=true;;
 		n) dry_run=true;;
 		u) unmap=true;;
+		V) exit_version;;
+		h) exit_help;;
 		*) false || exit
 	esac
 done

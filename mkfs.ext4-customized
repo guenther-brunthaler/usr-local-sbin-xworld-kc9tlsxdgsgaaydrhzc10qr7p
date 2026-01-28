@@ -1,8 +1,8 @@
 #! /bin/sh
 exit_version() {
 	cat << '---'; exit
-Version 2025.298.2
-Copyright (c) 2019-2025 Guenther Brunthaler. All rights reserved.
+Version 2026.28
+Copyright (c) 2019-2026 Guenther Brunthaler. All rights reserved.
 
 This script is free software.
 Distribution is permitted under the terms of the GPLv3.
@@ -13,9 +13,9 @@ trap 'test $? = 0 || echo "\"$0\" failed!" >& 2' 0
 
 exit_help() {
 	cat << ---; echo; exit_version
-$0 - customized mkfs.ext4 using different defaults
+$APP - customized mkfs.ext4 using different defaults
 
-$0 <options> <device>
+$APP <options> <device>
 
 -L <name>: (MANDATORY) Specify the volume label.
 -n: Show what would be done, but don't actually do anything.
@@ -33,6 +33,7 @@ $0 <options> <device>
 -V) Show script version and exit.
 ---
 }
+APP=${0##*/}
 
 JOURNAL=has_journal
 LABEL=
@@ -46,6 +47,7 @@ has_acls=false
 has_xattr=false
 atime= #noatime
 readonly=false
+non_interactive=false
 while getopts nC:U:JL:m:b:DAXhV:`: ar` OPT
 do
 	case $OPT in
@@ -76,6 +78,7 @@ then
 	test -s "$DEV"
 fi
 test -n "$LABEL"
+test -t 0 && test -t 1 || non_interactive=true
 
 run() {
 	local a
@@ -108,4 +111,4 @@ run() {
 	run fsck.ext4 -fvp "$DEV" || test "$?" = 1; set +x
 	echo "*** Success! ***"
 	run tune2fs -l "$DEV"
-} 2>& 1 | { $dry_run && cat || less; }
+} 2>& 1 | { { $dry_run || $non_interactive; } && cat || less; }

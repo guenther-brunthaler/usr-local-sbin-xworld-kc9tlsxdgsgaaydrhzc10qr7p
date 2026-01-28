@@ -48,7 +48,7 @@ has_xattr=false
 atime= #noatime
 readonly=false
 non_interactive=false
-while getopts nC:U:JL:m:b:DAXhV:`: ar` OPT
+while getopts nC:U:JL:m:b:DAXhV`: ar` OPT
 do
 	case $OPT in
 		n) dry_run=true;;

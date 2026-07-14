@@ -1,12 +1,45 @@
 #! /bin/sh
 
+# v2026.195
 set -e
 trap 'test $? = 0 || echo "${0##*/} failed!" >& 2' 0
-for bb in busybox-pbyqxzl1ktqlk3fjm3arlrclg busybox-localsite busybox
+
+mode=logread
+while getopts ds opt
 do
-	bb=`which $bb 2> /dev/null` && break
+	case $opt in
+		d) mode=systemd;;
+		s) mode=syslog;;
+		*) false || exit
+	esac
 done
+shift `expr $OPTIND - 1 || :`
+
+case $mode in
+	logread)
+		for bb in \
+			busybox-pbyqxzl1ktqlk3fjm3arlrclg busybox-localsite \
+			busybox
+		do
+			bb=`which $bb 2> /dev/null` && break
+		done
+esac
 lines=`tput lines || echo ${LINES:-25}`
 clear
-"$bb" logread | tail -n $lines
-exec "$bb" logread -f
+case $mode in
+	logread)
+		"$bb" logread | tail -n $lines
+		exec "$bb" logread -f
+		;;
+	systemd) journalctl -fn $lines --output=short-full;;
+	syslog)
+		for l in messages syslog
+		do
+			l=/var/log/$l
+			test -f "$l" && break
+		done
+		tail -n $lines -- "$l"
+		exec tail -f -- "$l"
+		;;
+	*) false || exit
+esac

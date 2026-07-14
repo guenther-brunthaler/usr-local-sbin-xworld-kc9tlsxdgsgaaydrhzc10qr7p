@@ -1,17 +1,60 @@
 #! /bin/sh
-# Copy all all binary executables (or shared libraries) specified as the
-# second and remaining command line arguments to the chroot jail directory
-# specified by the first argument. The destination directory and all the
-# specified files must exist. Option -d will delete the contents of the
-# destination directory before starting the copying, ensuring a fresh copy
-# with no unnecessary old files.
-#
-# Version 2022.145
-#
-# Copyright (c) 2020-2022 Guenther Brunthaler. All rights reserved.
-#
-# This script is free software.
-# Distribution is permitted under the terms of the GPLv3.
+exit_version() {
+	wr << ====; exit
+$APP Version 2026.195
+Copyright (c) 2020-2026 Guenther Brunthaler. All rights reserved.
+
+This script is free software.
+Distribution is permitted under the terms of the GPLv3.
+====
+}
+
+exit_help() {
+	wr << ====; echo; exit_version
+$APP - Populate chroot-jails
+
+Usage: $APP [ <options> ] <subdir> [ <executable_1> ... ]
+
+$APP populates a directory <subdir> with executables and shared library
+ dependencies taken from the live file system and copies them into a
+ sub-directory structure which can then be used as chroot-jail for running the
+ executables.
+
+The executables and/or shared libraries are taken from the remaining
+ arguments. If only <subdir> is specified, it is also used as <executable_1>.
+
+The arguments specifying the executables and shared libraries are normally
+ absolute path names.
+
+If such an argument however does not contain a directory component separator
+ ("/"), it will be searched via \$PATH and the resulting absolute pathname
+ will be used as the effective argument.
+
+After copying the specified executables and/or shared libraries into <subdir>
+ using the same relative pathname as the absolute pathname of the source
+ files, all additional shared libraries referenced by the copied files will
+ also be copied into <subdir>. This recursively includes shared libraries
+ referenced by the newly copied files as well.
+
+All the specified executables/libraries must exist.
+
+The <subdir> directory must not yet exist and will be created. However,
+ options -u and -d can be specified to modify this requirement (see below).
+
+Supported options:
+
+-d: Delete <subdir> before populating the chroot jail. <subdir> must already
+ exist.
+
+-u: Update the already-existing <subdir>. <subdir> must exist. This allows to
+ incrementally add more executables and/or shared libraries an
+ already-existing and partially populated chroot-jail directory instead of
+ specifying everything at once with a single invocation of $APP.
+
+-h: Show this help and exit. -V: Show version information and exit.
+====
+}
+APP=${0##*/}
 
 set -e
 cleanup() {
@@ -21,24 +64,57 @@ cleanup() {
 }
 trap cleanup 0
 TD=
-trap 'exit $?' TERM INT HUP QUIT
+trap 'exit $?' TERM INT HUP QUIT PIPE
+
+wr() {
+	{
+		unterminated=false
+		while IFS= read -r line
+		do
+			test "${line%" "}" = "$line"
+			test "${line#" "}" != "$line" && unterminated=false
+			$unterminated && echo
+			printf '%s' "$line"
+			unterminated=true
+		done
+		$unterminated && echo
+	} | fold -sw $LINEWIDTH
+}
+if
+	test -t 0 && LINEWIDTH=`tput cols 2> /dev/null` \
+	&& test "$LINEWIDTH"
+then
+	MAX=100
+	test $LINEWIDTH -gt $MAX && LINEWIDTH=$MAX
+else
+	LINEWIDTH=${COLUMNS:-66}
+fi
 
 delete=false
-while getopts d opt
+update=false
+while getopts udhV opt
 do
 	case $opt in
+		u) update=true;;
 		d) delete=true;;
+		h) exit_help;;
+		V) exit_version;;
 		*) false || exit
 	esac
 done
 shift `expr $OPTIND - 1 || :`
+
+case $# in
+	0) exit_help;;
+	1) set -- "$@" "$1"
+esac
 
 d=$1; d=${d%%/}
 case $d in
 	/*) d=/${d##/};;
 	-*) d=./$d
 esac
-test -d "$d"; shift
+shift
 
 n=$#
 while test $n != 0
@@ -62,6 +138,12 @@ then
 		-path "$d" \
 		-o -type d -exec rmdir -- {} \; \
 		-o -exec rm -- {} \;
+elif $update
+then
+	test -d "$d"
+else
+	test ! -e "$d"
+	mkdir -- "$d"
 fi
 
 TD=`mktemp -d -- "${TMPDIR:-/tmp}/${0##*/}.XXXXXXXXXX"`

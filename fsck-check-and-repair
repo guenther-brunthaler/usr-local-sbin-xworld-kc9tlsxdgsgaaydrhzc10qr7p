@@ -9,13 +9,13 @@
 # really are, and will not really be checked. supported filesystems. This
 # script supported being run in an initramfs in a BusyBox environment.
 #
-# Version 2018.51
-# Copyright (c) 2017 Guenther Brunthaler. All rights reserved.
+# Version 2026.195
+# Copyright (c) 2017-2026 Guenther Brunthaler. All rights reserved.
 # 
 # This script is free software.
 # Distribution is permitted under the terms of the GPLv3.
 
-SUPPORTED_FILESYSTEMS='ext2 ext3 ext4 reiserfs vfat'
+SUPPORTED_FILESYSTEMS='ext2 ext3 ext4 reiserfs vfat exfat'
 
 set -e
 cleanup() {
@@ -59,6 +59,9 @@ register reiserfs
 
 vfat_opts='-av'
 register vfat
+
+exfat_opts='-vp'
+register exfat
 
 colsort() {
 	printf '%s\n' "$*" | tr ' ' '\n' \
